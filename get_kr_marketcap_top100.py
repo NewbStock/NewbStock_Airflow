@@ -4,7 +4,7 @@
 시가총액 Top100 기업명과 종목코드'kr_top100.csv' 파일 생성해서 S3에 저장
 """
 
-from airlfow import DAG
+from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 from selenium import webdriver
