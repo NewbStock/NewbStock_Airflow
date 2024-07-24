@@ -88,7 +88,7 @@ dag = DAG(
     default_args=default_args,
     description='Daily crawling Korean Market Marketcap Top100 data to S3',
     catchup = False,
-    schedule_interval='* 18 * * *',  # 장 마감 후, 평일(1,2,3,4,5) 저녁 6시 
+    schedule_interval='0 9 * * 1-5',  # UTC 09:00 (KST 18:00), 월요일부터 금요일까지 장 마감 후, 저녁 6시 동작  
       
 )
 
