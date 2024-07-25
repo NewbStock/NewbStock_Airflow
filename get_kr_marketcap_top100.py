@@ -1,7 +1,7 @@
 """
 한국경제 코리아마켓 웹사이트에서 제공하는 시가총액 정보
 "https://markets.hankyung.com/index-info/marketcap"
-시가총액 Top100 기업명과 종목코드'kr_top100.csv' 파일 생성해서 S3에 저장
+시가총액 Top100 기업명과 종목코드 'kr_top100.csv' 파일 생성해서 S3에 저장
 """
 
 from airflow import DAG
@@ -14,13 +14,16 @@ from webdriver_manager.chrome import ChromeDriverManager
 from datetime import datetime
 from datetime import timedelta
 import pandas as pd
+import logging
 import time
+import io
 
+# redshift에 저장 코드 추가 필요 
 
 def get_kr_marketcap_top100():
     # 파일 경로 실제 사용하는 버킷, 파일 경로로 변경 필요
     bucket_name = 'team-won-2-bucket'
-    output_key = 's3://team-won-2-bucket/kr_stock_data/kr_top100.csv'
+    output_key = 'kr_stock_data/kr_top100.csv'
 
     # 크롬 백그라운드 실행
     options = webdriver.ChromeOptions()
@@ -49,12 +52,11 @@ def get_kr_marketcap_top100():
                 # 각 행의 첫 번째 열 (기업명)과 두 번째 열 (종목코드)을 찾음
                 try:
                     company_name = row.find_element(By.CSS_SELECTOR, "p.stock-name.ellip a").text
-                    #code = row.find_element(By.CSS_SELECTOR, "p.code.txt-num.ellip").text.strip()
                     code = row.find_element(By.CSS_SELECTOR, "p.code.txt-num.ellip").text
                     companies.append(company_name)
                     codes.append(code)
                 except Exception as e:
-                    print(f"Error processing row: {e}")
+                    logging.info(f"Error processing row: {e}")
 
             # 크롤링한 데이터를 데이터프레임으로 변환
             df = pd.DataFrame({
@@ -63,16 +65,14 @@ def get_kr_marketcap_top100():
             })
 
         # DataFrame을 CSV 형식으로 변환
-        df.to_csv('kr_top100.csv', index=False, encoding='utf-8-sig')
-
-        # WebDriver 종료
-        driver.quit()
+        csv_buffer = io.StringIO()
+        df.to_csv(csv_buffer, index=False, encoding='utf-8-sig')
+        csv_buffer.seek(0)
 
     # S3에 파일 업로드
     s3_hook = S3Hook(aws_conn_id='s3_conn')   # connection 생성 후 변경 필요
-    csv_buffer = pd.compat.StringIO()
     s3_hook.load_string(csv_buffer.getvalue(), output_key, bucket_name, replace=True)
-    print("CSV 파일이 성공적으로 저장되었습니다.")
+    logging.info("Successfully upload kr_top100.csv to S3")
 
 
 default_args = {
