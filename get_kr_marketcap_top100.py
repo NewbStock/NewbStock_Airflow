@@ -30,7 +30,8 @@ def get_kr_marketcap_top100():
     options.add_argument("headless")
 
     # Selenium 실행
-    with webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options) as driver:
+    remote_webdriver = 'remote_chromedriver'
+    with webdriver.Remote(f'{remote_webdriver}:4444/wd/hub', options=options) as driver:
         url = 'https://markets.hankyung.com/index-info/marketcap'
         driver.get(url)
         driver.implicitly_wait(10) # 페이지 렌더링 대기
@@ -63,7 +64,9 @@ def get_kr_marketcap_top100():
                 'CompanyName': companies,
                 'CompanyCode': codes
             })
-
+        
+        logging.info(df)
+        
         # DataFrame을 CSV 형식으로 변환
         csv_buffer = io.StringIO()
         df.to_csv(csv_buffer, index=False, encoding='utf-8-sig')
