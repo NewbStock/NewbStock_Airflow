@@ -7,6 +7,7 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+from airflow.providers.postgres.hooks.postgres import PostgresHook
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
@@ -18,8 +19,16 @@ import logging
 import time
 import io
 
-# redshift에 저장 코드 추가 필요 
 
+# AWS Redshift 연결
+def get_redshift_connection():
+    hook = PostgresHook(postgres_conn_id='redshift_conn')
+    conn = hook.get_conn()
+    conn.autocommit = True  # default는 False
+    return conn.cursor() 
+
+
+# 매일 한국 주식 주가총액 top100 기업명과 종목코드 웹스크랩핑
 def get_kr_marketcap_top100():
     # 파일 경로 실제 사용하는 버킷, 파일 경로로 변경 필요
     bucket_name = 'team-won-2-bucket'
@@ -32,7 +41,7 @@ def get_kr_marketcap_top100():
     # Selenium 실행
     remote_webdriver = 'remote_chromedriver'
     with webdriver.Remote(f'{remote_webdriver}:4444/wd/hub', options=options) as driver:
-        url = 'https://markets.hankyung.com/index-info/marketcap'
+        url = 'https://markets.hankyung.com/index-info/marketcap'  # 오후 3시 30분 장 마감, 3시 50분 고정 시가총액 
         driver.get(url)
         driver.implicitly_wait(10) # 페이지 렌더링 대기
 
@@ -64,18 +73,41 @@ def get_kr_marketcap_top100():
                 'CompanyName': companies,
                 'CompanyCode': codes
             })
-        
-        logging.info(df)
-        
+
+        logging.info(df)    
+
         # DataFrame을 CSV 형식으로 변환
         csv_buffer = io.StringIO()
         df.to_csv(csv_buffer, index=False, encoding='utf-8-sig')
         csv_buffer.seek(0)
 
     # S3에 파일 업로드
-    s3_hook = S3Hook(aws_conn_id='s3_conn')   # connection 생성 후 변경 필요
-    s3_hook.load_string(csv_buffer.getvalue(), output_key, bucket_name, replace=True)
-    logging.info("Successfully upload kr_top100.csv to S3")
+    try:
+        s3_hook = S3Hook(aws_conn_id='s3_conn')   # connection 생성 후 변경 필요
+        s3_hook.load_string(csv_buffer.getvalue(), output_key, bucket_name, replace=True)
+        logging.info("Successfully upload kr_top100.csv to S3")
+    except Exception as e:
+        logging.error(f"Failed to upload to S3: {e}")
+
+
+    # Redshift 테이블 kr_top100 데이터 Insert
+    try:
+        cur = get_redshift_connection()
+
+        # 오늘 날짜
+        today_date = datetime.now().strftime('%Y-%m-%d')
+        
+        for index, row in df.iterrows():
+            insert_sql = f"""
+            INSERT INTO kr_top100 (date, name, code)
+            VALUES ('{today_date}', '{row['CompanyName']}', '{row['CompanyCode']}')
+            """
+            cur.execute(insert_sql) 
+        
+        cur.close()
+        logging.info("Successfully inserted data into Redshift table kr_top100")
+    except Exception as e:
+        logging.error(f"Failed to insert data into Redshift: {e}")
 
 
 default_args = {
