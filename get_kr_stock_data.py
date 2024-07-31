@@ -10,7 +10,7 @@ from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 import FinanceDataReader as fdr
 import pandas as pd
-import datetime
+from datetime import datetime
 import logging
 from io import StringIO
 
