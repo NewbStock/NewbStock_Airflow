@@ -7,6 +7,7 @@ S3에서 'kr_top100.csv' 데이터 가져오기
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+from airflow.providers.postgres.hooks.postgres import PostgresHook
 import FinanceDataReader as fdr
 import pandas as pd
 import datetime
@@ -14,7 +15,15 @@ import logging
 from io import StringIO
 
 
-# S3에서 'kr_top100.csv' 데이터 가져오기
+# AWS Redshift 연결
+def get_redshift_connection():
+    hook = PostgresHook(postgres_conn_id='redshift_conn')
+    conn = hook.get_conn()
+    conn.autocommit = True  # default는 False
+    return conn.cursor()
+
+
+# S3에서 'kr_top100.csv' (오늘 시가총액 top100) 데이터 가져오기
 def get_kr_top100():
     bucket_name = 'team-won-2-bucket'
     input_key = 'kr_stock_data/kr_top100.csv'
@@ -31,6 +40,20 @@ def get_kr_top100():
     except Exception as e:
         logging.error(f"Error reading kr_top100.csv from S3: {str(e)}")
         return 
+    
+
+# Redshift 테이블 kr_top100에서 distinct (name, code) 데이터 가져오기  
+def get_disticnt_data():
+    cur = get_redshift_connection()
+    cur.execute(f"""
+        SELECT DISTINCT name, code
+        FROM kr_top100
+    """)
+    distinct_data = cur.fetchall()
+    distinct_data = [{'name': row[0], 'code': row[1]} for row in distinct_data]
+    
+    logging.info(distinct_data)
+    return distinct_data
 
 
 # S3에 존재하는 파일 이름 확인하기
@@ -54,36 +77,52 @@ def check_existing_files():
         return 
 
 
+def update_redshift(update_df):
+    # redshift 연결
+    cur = get_redshift_connection()
+    
+    # 한국 주식 과거 데이터 테이블 생성 
+    cur.execute = f"""CREATE TALBE IF NOT EXISTS kr_stock_data (
+        date DATE,
+        name VARCHAR(100),
+        code VARCHAR(20),
+        open NUMERIC(8,2)
+    );"""
+    
+    try:
+        # Date, Open, High, Low, Close, Volume, Change, Updown, Comp, Amount, MarCap, Shares
+        for index, row in update_df.iterrows():
+            cur.execute("""
+                INSERT INTO kr_stock_data (date, name, code, open_value)
+                VALUES (%s, %s, %s, %s)
+            """, (row['Date'], row['name'], row['code'], row['Open']))
+    except Exception as e:
+        logging.error(f"Error updating Redshift {update_df['name']} ({update_df['code']}): {str(e)}")
+
+
 # S3에 시가총액 Top100 데이터 업데이트 및 생성
 def update_stock_data():
     bucket_name = 'team-won-2-bucket'
     s3_hook = S3Hook(aws_conn_id='s3_conn') 
 
     # 한국 시장 시가총액 100위 데이터 가져오기
-    df_kr_top100 = get_kr_top100()
-    current_codes = set(df_kr_top100['CompanyCode'].astype(str).str.zfill(6))
+    # df_kr_top100 = get_kr_top100()
+    # current_codes = set(df_kr_top100['CompanyCode'].astype(str).str.zfill(6))
     
+    distinct_data = get_disticnt_data()
+
     # 이미 존재하는 주식 데이터 파일 확인 
     existing_codes = check_existing_files()
 
-    # 이미 존재하는 주식 데이터 중에서 현재 시가총액 Top100에 없는 파일 삭제
-    for code in existing_codes:
-        if code not in current_codes:
-            key = f'kr_stock_data/stock_data/{code}.csv'
-            try:
-                s3_hook.delete_objects(bucket_name, key)
-                logging.info(f"Deleted outdated file: {code}.csv")
-            except Exception as e:
-                logging.error(f"Error deleting file {code}.csv: {str(e)}")
-
     # 현재 top 100 기업의 데이터 업데이트 또는 새로 생성
-    for row in df_kr_top100.itertuples():
-        company_name = row.CompanyName
-        company_code = str(row.CompanyCode).zfill(6)  # 'code' 컬럼의 값을 6자리로 맞추기 (앞에 0 추가)
+    for company in distinct_data:
+        company_name = company['name']
+        company_code = company['code']
+        #company_code = str(company['code']).zfill(6)  # 'code' 컬럼의 값을 6자리로 맞추기 (앞에 0 추가)
 
         try:
             if company_code in existing_codes:
-                 # 기존 파일 읽기
+                # 기존 파일 읽기
                 file_content = s3_hook.read_key(key, bucket_name)
                 existing_df = pd.read_csv(StringIO(file_content), index_col=0, parse_dates=True)
                 new_record = fdr.DataReader(f'KRX:{company_code}', datetime.date.today())  # UTC, KST 주의
@@ -91,7 +130,9 @@ def update_stock_data():
                 df = pd.concat([existing_df, new_record])            
             else:
                 df = fdr.DataReader(f'KRX:{company_code}', start_date = '2000-01-01')        
-
+            
+            # FinanceDataReader 컬럼
+            # Date, Open, High, Low, Close, Volume, Change, Updown, Comp, Amount, MarCap, Shares
             if not df.empty:
                 key = f'kr_stock_data/stock_data/{company_code}.csv'
                 csv_buffer = StringIO()
@@ -104,10 +145,16 @@ def update_stock_data():
                     replace=True
                 )
                 logging.info(f"Successfully saved data for {company_name} {company_code}")
+
+                # Redshift에 데이터 업데이트
+                df['name'] = company_name
+                df['code'] = company_code
+                update_redshift(df)
             else:
                 logging.info(f"Fail to get stock data for {company_name} {company_code}")
         except Exception as e:
             logging.error(f"Error processing {company_name} ({company_code}): {str(e)}")
+
 
 
 
@@ -117,17 +164,17 @@ default_args = {
     'retries': 1,
 }
 
-dag = DAG(
-    'get_kr_marketcap_top100',
+with DAG ( 
+    dag_id='get_kr_marketcap_top100',
     default_args=default_args,
     description='With FinanceDataReader, download, process, and upload KOSPI Marketcap Top100 data to S3',
     schedule_interval='30 9 * * 1-5',  # UTC 09:30 (KST 18:30), 월요일부터 금요일까지 장 마감 후  
     start_date=datetime(2024, 7, 15),  # 시작 날짜
     catchup=True,
-)
+) as dag:
 
-process_and_upload_stock_data_task = PythonOperator(
-    task_id='update_kr_stock_data',
-    python_callable=update_stock_data,
-    dag=dag,
-)
+    process_and_upload_stock_data_task = PythonOperator(
+        task_id='update_kr_stock_data',
+        python_callable=update_stock_data,
+        dag=dag,
+    )
