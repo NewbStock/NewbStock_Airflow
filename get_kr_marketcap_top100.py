@@ -30,7 +30,6 @@ def get_redshift_connection():
 
 # 매일 한국 주식 주가총액 top100 기업명과 종목코드 웹스크랩핑
 def get_kr_marketcap_top100():
-    # 파일 경로 실제 사용하는 버킷, 파일 경로로 변경 필요
     bucket_name = 'team-won-2-bucket'
     output_key = 'kr_stock_data/kr_top100.csv'
 
@@ -83,7 +82,7 @@ def get_kr_marketcap_top100():
 
     # S3에 파일 업로드
     try:
-        s3_hook = S3Hook(aws_conn_id='s3_conn')   # connection 생성 후 변경 필요
+        s3_hook = S3Hook(aws_conn_id='s3_conn')   
         s3_hook.load_string(csv_buffer.getvalue(), output_key, bucket_name, replace=True)
         logging.info("Successfully upload kr_top100.csv to S3")
     except Exception as e:
@@ -93,16 +92,16 @@ def get_kr_marketcap_top100():
     # Redshift 테이블 kr_top100 데이터 Insert
     try:
         cur = get_redshift_connection()
-
-        # 오늘 날짜
-        today_date = datetime.now().strftime('%Y-%m-%d')
         
+        # 오늘 날짜
+        today = datetime.now().date()
+    
         for index, row in df.iterrows():
             insert_sql = f"""
             INSERT INTO kr_top100 (date, name, code)
-            VALUES ('{today_date}', '{row['CompanyName']}', '{row['CompanyCode']}')
+            VALUES (%s, %s, %s)
             """
-            cur.execute(insert_sql) 
+            cur.execute(insert_sql, (today, row['CompanyName'], row['CompanyCode'])) 
         
         cur.close()
         logging.info("Successfully inserted data into Redshift table kr_top100")
@@ -118,19 +117,18 @@ default_args = {
     'retry_delay': timedelta(minutes=5),
 }
 
-dag = DAG(
+with DAG(
     dag_id = 'get_kr_marketcap_top100',
     default_args=default_args,
     description='Daily crawling Korean Market Marketcap Top100 data to S3',
     catchup = False,
     schedule_interval='0 9 * * 1-5',  # UTC 09:00 (KST 18:00), 월요일부터 금요일까지 장 마감 후, 저녁 6시 동작  
       
-)
+) as dag:
 
-process_kospi_data_task = PythonOperator(
-    task_id='get_kr_marketcap_top100',
-    python_callable=get_kr_marketcap_top100,
-    dag=dag,
-)
+    process_kospi_data_task = PythonOperator(
+        task_id='get_kr_marketcap_top100',
+        python_callable=get_kr_marketcap_top100,
+    )
 
 
