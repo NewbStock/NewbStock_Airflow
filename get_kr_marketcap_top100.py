@@ -92,9 +92,10 @@ def get_kr_marketcap_top100():
     # Redshift 테이블 kr_top100 데이터 Insert
     try:
         cur = get_redshift_connection()
-
-        today = datetime.now().date()
         
+        # 오늘 날짜
+        today = datetime.now().date()
+    
         for index, row in df.iterrows():
             insert_sql = f"""
             INSERT INTO kr_top100 (date, name, code)
