@@ -47,13 +47,9 @@ def get_kr_top100():
 # Redshift 테이블 kr_top100에서 distinct (name, code) 데이터 가져오기  
 def get_disticnt_data():
     cur = get_redshift_connection()
-    cur.execute(f"""
-        SELECT DISTINCT name, code
-        FROM kr_top100
-    """)
+    cur.execute("SELECT DISTINCT name, code FROM kr_top100")
     distinct_data = cur.fetchall()
     distinct_data = [{'name': row[0], 'code': row[1]} for row in distinct_data]
-    
     logging.info(distinct_data)
     return distinct_data
 
@@ -67,7 +63,7 @@ def check_existing_files():
 
     try:
         # S3에서 파일 목록 가져오기
-        existing_files = s3_hook.list_keys(bucket_namet=bucket_name, prefix=prefix)
+        existing_files = s3_hook.list_keys(bucket_name=bucket_name, prefix=prefix)
 
         # CompanyCode 추출 (파일 이름에서 .csv 제거) e.g) 'Key': 'folder/file1.txt',
         existing_codes = [file.split('/')[-1].replace('.csv', '') for file in existing_files if file.endswith('.csv')]
@@ -84,12 +80,12 @@ def update_redshift(update_df):
     cur = get_redshift_connection()
     
     # 한국 주식 과거 데이터 테이블 생성 
-    cur.execute = f"""CREATE TALBE IF NOT EXISTS kr_stock_data (
-        date DATE,
-        name VARCHAR(100),
-        code VARCHAR(20),
-        open NUMERIC(8,2)
-    );"""
+    # cur.execute = f """CREATE TALBE IF NOT EXISTS kr_stock_data (
+    #     date DATE,
+    #     name VARCHAR(100),
+    #     code VARCHAR(20),
+    #     open NUMERIC(8,2)
+    # );"""
     
     try:
         # Date, Open, High, Low, Close, Volume, Change, Updown, Comp, Amount, MarCap, Shares
@@ -128,7 +124,6 @@ def update_stock_data():
                 file_content = s3_hook.read_key(key, bucket_name)
                 existing_df = pd.read_csv(StringIO(file_content), index_col=0, parse_dates=True)
                 new_record = fdr.DataReader(f'KRX:{company_code}', datetime.date.today())  # UTC, KST 주의
-
                 df = pd.concat([existing_df, new_record])            
             else:
                 df = fdr.DataReader(f'KRX:{company_code}', start_date = '2000-01-01')        
