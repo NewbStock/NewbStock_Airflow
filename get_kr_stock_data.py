@@ -79,13 +79,7 @@ def update_redshift(update_df):
     # redshift 연결
     cur = get_redshift_connection()
     
-    # 한국 주식 과거 데이터 테이블 생성 
-    # cur.execute = f """CREATE TALBE IF NOT EXISTS kr_stock_data (
-    #     date DATE,
-    #     name VARCHAR(100),
-    #     code VARCHAR(20),
-    #     open NUMERIC(8,2)
-    # );"""
+    # 한국 주식 과거 데이터 테이블 date, name, code, open
     
     try:
         # Date, Open, High, Low, Close, Volume, Change, Updown, Comp, Amount, MarCap, Shares
@@ -126,7 +120,7 @@ def update_stock_data():
                 new_record = fdr.DataReader(f'KRX:{company_code}', datetime.date.today())  # UTC, KST 주의
                 df = pd.concat([existing_df, new_record])            
             else:
-                df = fdr.DataReader(f'KRX:{company_code}', start_date = '2000-01-01')        
+                df = fdr.DataReader(f'KRX:{company_code}', start = '2000-01-01')        
             
             # FinanceDataReader 컬럼
             # Date, Open, High, Low, Close, Volume, Change, Updown, Comp, Amount, MarCap, Shares
