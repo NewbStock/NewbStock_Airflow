@@ -50,7 +50,6 @@ def get_disticnt_data():
     cur.execute("SELECT DISTINCT name, code FROM kr_top100")
     distinct_data = cur.fetchall()
     distinct_data = [{'name': row[0], 'code': row[1]} for row in distinct_data]
-    #logging.info(distinct_data)
     logging.info("Successfully get distinct data from Redshift table kr_top100")
     return distinct_data
 
@@ -120,14 +119,17 @@ def update_stock_data():
                 file_content = s3_hook.read_key(key, bucket_name)
                 existing_df = pd.read_csv(StringIO(file_content), index_col=0, parse_dates=True)
                 new_record = fdr.DataReader(f'KRX:{company_code}', datetime.date.today())  # UTC, KST 주의
+                new_record.index.name = 'Date'  # 인덱스 이름 설정
+                new_record.reset_index(inplace=True)  # 인덱스를 컬럼으로 변환
                 df = pd.concat([existing_df, new_record])            
             else:
-                df = fdr.DataReader(f'KRX:{company_code}', start = '2000-01-01')        
+                df = fdr.DataReader(f'KRX:{company_code}', start = '2000-01-01')
+                df.index.name = 'Date'  # 인덱스 이름 설정
+                df.reset_index(inplace=True)  # 인덱스를 컬럼으로 변환
             
             # FinanceDataReader 컬럼
             # Date, Open, High, Low, Close, Volume, Change, Updown, Comp, Amount, MarCap, Shares
             if not df.empty:
-                
                 csv_buffer = StringIO()
                 df.to_csv(csv_buffer, index=True)
                 """
@@ -138,12 +140,12 @@ def update_stock_data():
                     replace=True
                 )
                 """
+                
                 logging.info(f"Successfully saved data for {company_name} {company_code}")
 
                 # Redshift에 데이터 업데이트
                 df['name'] = company_name
                 df['code'] = company_code
-                df['Date'] = pd.to_datetime(df['Date'])
                 update_redshift(df)
             else:
                 logging.info(f"Fail to get stock data for {company_name} {company_code}")
