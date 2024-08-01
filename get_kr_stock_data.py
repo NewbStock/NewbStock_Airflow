@@ -50,7 +50,8 @@ def get_disticnt_data():
     cur.execute("SELECT DISTINCT name, code FROM kr_top100")
     distinct_data = cur.fetchall()
     distinct_data = [{'name': row[0], 'code': row[1]} for row in distinct_data]
-    logging.info(distinct_data)
+    #logging.info(distinct_data)
+    logging.info("Successfully get distinct data from Redshift table kr_top100")
     return distinct_data
 
 
@@ -128,18 +129,20 @@ def update_stock_data():
                 key = f'kr_stock_data/stock_data/{company_code}.csv'
                 csv_buffer = StringIO()
                 df.to_csv(csv_buffer, index=True)
-
+                """
                 s3_hook.load_string(
                     string_data=csv_buffer.getvalue(),
                     key=key,
                     bucket_name=bucket_name,
                     replace=True
                 )
+                """
                 logging.info(f"Successfully saved data for {company_name} {company_code}")
 
                 # Redshift에 데이터 업데이트
                 df['name'] = company_name
                 df['code'] = company_code
+                df['Date'] = pd.to_datetime(df['Date'])
                 update_redshift(df)
             else:
                 logging.info(f"Fail to get stock data for {company_name} {company_code}")
