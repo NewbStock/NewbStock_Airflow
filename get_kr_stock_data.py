@@ -111,11 +111,12 @@ def update_stock_data():
     for company in distinct_data:
         company_name = company['name']
         company_code = company['code']
+        key = f'kr_stock_data/stock_data/{company_code}.csv'
         #company_code = str(company['code']).zfill(6)  # 'code' 컬럼의 값을 6자리로 맞추기 (앞에 0 추가)
 
         try:
             if company_code in existing_codes:
-                # 기존 파일 읽기
+                # 기존 파일 읽어오기
                 file_content = s3_hook.read_key(key, bucket_name)
                 existing_df = pd.read_csv(StringIO(file_content), index_col=0, parse_dates=True)
                 new_record = fdr.DataReader(f'KRX:{company_code}', datetime.date.today())  # UTC, KST 주의
@@ -126,7 +127,7 @@ def update_stock_data():
             # FinanceDataReader 컬럼
             # Date, Open, High, Low, Close, Volume, Change, Updown, Comp, Amount, MarCap, Shares
             if not df.empty:
-                key = f'kr_stock_data/stock_data/{company_code}.csv'
+                
                 csv_buffer = StringIO()
                 df.to_csv(csv_buffer, index=True)
                 """
