@@ -24,6 +24,7 @@ def get_redshift_connection():
 
 
 # S3에서 'kr_top100.csv' (오늘 시가총액 top100) 데이터 가져오기
+"""
 def get_kr_top100():
     bucket_name = 'team-won-2-bucket'
     input_key = 'kr_stock_data/kr_top100.csv'
@@ -40,7 +41,8 @@ def get_kr_top100():
     except Exception as e:
         logging.error(f"Error reading kr_top100.csv from S3: {str(e)}")
         return 
-    
+"""
+
 
 # Redshift 테이블 kr_top100에서 distinct (name, code) 데이터 가져오기  
 def get_disticnt_data():
