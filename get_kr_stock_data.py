@@ -167,7 +167,7 @@ default_args = {
 }
 
 with DAG ( 
-    dag_id='get_kr_marketcap_top100',
+    dag_id='get_kr_stock_data',
     default_args=default_args,
     description='With FinanceDataReader, download, process, and upload KOSPI Marketcap Top100 data to S3',
     schedule_interval='30 9 * * 1-5',  # UTC 09:30 (KST 18:30), 월요일부터 금요일까지 장 마감 후  
