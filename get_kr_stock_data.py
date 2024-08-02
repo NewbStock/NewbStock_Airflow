@@ -87,7 +87,7 @@ def update_redshift(update_df):
             cur.execute("""
                 INSERT INTO kr_stock_data (date, name, code, open_value)
                 VALUES (%s, %s, %s, %s)
-            """, (row['Date'].date().isoformat(), row['name'], row['code'], row['Open']))
+            """, (row['Date'].strftime('%Y-%m-%d'), row['name'], row['code'], row['Open']))
     except Exception as e:
         logging.error(f"Error updating Redshift {update_df['name']} ({update_df['code']}): {str(e)}")
 
@@ -132,15 +132,14 @@ def update_stock_data():
             if not df.empty:
                 csv_buffer = StringIO()
                 df.to_csv(csv_buffer, index=True)
-                """
+
                 s3_hook.load_string(
                     string_data=csv_buffer.getvalue(),
                     key=key,
                     bucket_name=bucket_name,
                     replace=True
-                )
-                """
-                
+
+        
                 logging.info(f"Successfully saved data for {company_name} {company_code}")
 
                 # Redshift에 데이터 업데이트
