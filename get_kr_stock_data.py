@@ -138,8 +138,7 @@ def update_stock_data():
                     key=key,
                     bucket_name=bucket_name,
                     replace=True
-
-        
+                
                 logging.info(f"Successfully saved data for {company_name} {company_code}")
 
                 # Redshift에 데이터 업데이트
