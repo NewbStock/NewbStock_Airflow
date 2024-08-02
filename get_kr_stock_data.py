@@ -137,7 +137,7 @@ def update_stock_data():
                     string_data=csv_buffer.getvalue(),
                     key=key,
                     bucket_name=bucket_name,
-                    replace=True
+                    replace=True)
                 
                 logging.info(f"Successfully saved data for {company_name} {company_code}")
 
