@@ -118,7 +118,7 @@ def update_stock_data():
                 # 기존 파일 읽어오기
                 file_content = s3_hook.read_key(key, bucket_name)
                 existing_df = pd.read_csv(StringIO(file_content), index_col=0, parse_dates=True)
-                new_record = fdr.DataReader(f'KRX:{company_code}', datetime.date.today())  # UTC, KST 주의
+                new_record = fdr.DataReader(f'KRX:{company_code}', datetime.today().date())  # UTC, KST 주의
                 new_record.index.name = 'Date'  # 인덱스 이름 설정
                 new_record.reset_index(inplace=True)  # 인덱스를 컬럼으로 변환
                 df = pd.concat([existing_df, new_record])            
