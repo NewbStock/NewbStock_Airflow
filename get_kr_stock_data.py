@@ -87,7 +87,7 @@ def update_redshift(update_df):
             cur.execute("""
                 INSERT INTO kr_stock_data (date, name, code, open_value)
                 VALUES (%s, %s, %s, %s)
-            """, (row['Date'], row['name'], row['code'], row['Open']))
+            """, (row['Date'].strftime('%Y-%m-%d'), row['name'], row['code'], row['Open']))
     except Exception as e:
         logging.error(f"Error updating Redshift {update_df['name']} ({update_df['code']}): {str(e)}")
 
