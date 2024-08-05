@@ -35,8 +35,9 @@ def stock_top3():
         csv_content = s3_hook.read_key(s3_key, s3_bucket)
 
         df = pd.read_csv(StringIO(csv_content))
-
+        logging.info(f"DataFrame head: {df.head()}")  # DataFrame의 상위 5개 행을 출력하여 구조 확인
         top_3_codes = df['Code'].head(3).tolist()
+        logging.info(f"Top 3 codes: {top_3_codes}")  # 상위 3개 코드를 로그로 출력
         return top_3_codes
     
     @task(task_id="fetch_csv_files")
@@ -44,13 +45,20 @@ def stock_top3():
         s3_hook = S3Hook(aws_conn_id='s3_conn')
         s3_bucket = 'team-won-2-bucket'
         s3_key = 'newb_data/stock_data/stock_high_volatillity.csv'
-        
+
         for code in top_3_codes:
             file_key = f'us_stock_data/history/{code}.csv'
             try:
                 csv_content = s3_hook.read_key(file_key, s3_bucket)
-                df = pd.read_csv(pd.compat.StringIO(csv_content))
-                s3_hook.load_file(df, s3_key, bucket_name=s3_bucket, replace=True)
+                df = pd.read_csv(StringIO(csv_content))
+                
+                # 임시 파일에 CSV 내용을 저장
+                temp_csv = f"/tmp/{code}.csv"
+                df.to_csv(temp_csv, index=False)
+                
+                # S3에 업로드
+                s3_hook.load_file(filename=temp_csv, key=s3_key, bucket_name=s3_bucket, replace=True)
+                logging.info(f"Successfully processed {file_key}")
             except Exception as e:
                 logging.error(f"Error reading file {file_key} from S3: {e}")
 
