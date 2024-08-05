@@ -6,6 +6,7 @@ from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
 import pandas as pd
 import logging
+from io import StringIO
 
 default_args = {
     'owner': 'airflow',
@@ -33,7 +34,7 @@ def stock_top3():
         s3_key = 'us_stock_data/us_stock_top100.csv'
         csv_content = s3_hook.read_key(s3_key, s3_bucket)
 
-        df = pd.read_csv(pd.compat.StringIO(csv_content))
+        df = pd.read_csv(StringIO(csv_content))
 
         top_3_codes = df['Code'].head(3).tolist()
         return top_3_codes
