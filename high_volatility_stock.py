@@ -91,7 +91,4 @@ def stock_top3():
     local_files = fetch_csv_files(top_3_codes)
     find_max_change_date(local_files)
 
-    top_3_codes = read_csv_from_s3()
-    fetch_csv_files(top_3_codes)
-
 dag = stock_top3()
