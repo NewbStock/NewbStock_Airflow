@@ -29,7 +29,7 @@ def kospi_etl():
     def fetch_data():
         end_date = datetime.now().strftime('%Y%m%d')
 
-        url = f"https://ecos.bok.or.kr/api/StatisticSearch/GZJ2WT8Y559OMJKLPMRQ/json/kr/1/99999/802YO01/D/19900101/{end_date}"
+        url = f"https://ecos.bok.or.kr/api/StatisticSearch/GZJ2WT8Y559OMJKLPMRQ/json/kr/1/99999/802Y0011/D/19900101/{end_date}"
         response = requests.get(url)
         data = response.json()
 
