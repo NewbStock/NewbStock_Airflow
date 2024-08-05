@@ -5,7 +5,6 @@ from airflow.decorators import task, dag
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
 
-# 기본 인자 설정
 default_args = {
     'owner': 'airflow',
     'depends_on_past': False,
@@ -33,7 +32,7 @@ def exchange_rate_etl():
         data = response.json()
 
         # 데이터를 CSV 파일로 저장
-        file_path = '/tmp/KeyStatisticList.csv'
+        file_path = '/tmp/bank_of_kroea/KeyStatisticList.csv'
         fieldnames = ["STAT_CODE", "STAT_NAME", "ITEM_CODE1", "ITEM_NAME1", "ITEM_CODE2", "ITEM_NAME2", 
                       "ITEM_CODE3", "ITEM_NAME3", "ITEM_CODE4", "ITEM_NAME4", "UNIT_NAME", "WGT", "TIME", "DATA_VALUE"]
         
