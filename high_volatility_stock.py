@@ -3,7 +3,6 @@ import requests
 from datetime import datetime, timedelta
 from airflow.decorators import task, dag
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
-from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
 import pandas as pd
 import logging
 from io import StringIO
@@ -42,7 +41,8 @@ def stock_top3():
     def fetch_csv_files(top_3_codes):
         s3_hook = S3Hook(aws_conn_id='s3_conn')
         s3_bucket = 'team-won-2-bucket'
-        
+        local_files = []
+
         for code in top_3_codes:
             file_key = f'us_stock_data/history/{code}.csv'
             s3_key = f'newb_data/stock_data/{code}.csv'
@@ -54,14 +54,12 @@ def stock_top3():
                 temp_csv = f"/tmp/{code}.csv"
                 df.to_csv(temp_csv, index=False)
                 
-                # S3에 업로드
-                s3_hook.load_file(filename=temp_csv, key=s3_key, bucket_name=s3_bucket, replace=True)
+                local_files.append(temp_csv)
                 logging.info(f"Successfully processed {file_key}")
             except Exception as e:
                 logging.error(f"Error reading file {file_key} from S3: {e}")
-            
-            return local_files
-        
+
+        return local_files
     
     @task(task_id="find_max_change_date")
     def find_max_change_date(local_files):
