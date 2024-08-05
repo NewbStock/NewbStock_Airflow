@@ -43,7 +43,7 @@ def gdp_etl():
             response = requests.get(url)
             data = response.json()
 
-            file_path = f'/tmp/{country_name}_GDP.csv'
+            file_path = f'/tmp/bank_of_kroea/GDP/{country_name}.csv'
             fieldnames = ["STAT_CODE", "STAT_NAME", "ITEM_CODE1", "ITEM_NAME1", "ITEM_CODE2", "ITEM_NAME2", 
                             "ITEM_CODE3", "ITEM_NAME3", "ITEM_CODE4", "ITEM_NAME4", "UNIT_NAME", "WGT", "TIME", "DATA_VALUE"]
             
