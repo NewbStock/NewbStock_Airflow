@@ -45,7 +45,6 @@ def stock_top3():
 
         for code in top_3_codes:
             file_key = f'us_stock_data/history/{code}.csv'
-            s3_key = f'newb_data/stock_data/{code}.csv'
             try:
                 csv_content = s3_hook.read_key(file_key, s3_bucket)
                 df = pd.read_csv(StringIO(csv_content))
@@ -63,11 +62,13 @@ def stock_top3():
     
     @task(task_id="find_high_volatility_days")
     def find_high_volatility_days(local_files):
-        high_volatility_days = []
+        s3_hook = S3Hook(aws_conn_id='s3_conn')
+        s3_bucket = 'team-won-2-bucket'
         
         for file_path in local_files:
             df = pd.read_csv(file_path)
-            
+            code = df['Code'].iloc[0]
+
             # 변동률 계산
             df['Close'] = df['Close'].astype(float)
             df['Prev_Close'] = df['Close'].shift(1)
@@ -75,18 +76,14 @@ def stock_top3():
 
             # 변동률이 10% 이상인 날짜 찾기
             high_volatility = df[df['Change'].abs() > 10]
-            for _, row in high_volatility.iterrows():
-                high_volatility_days.append({
-                    'Code': df['Code'].iloc[0],
-                    'Date': row['Date'],
-                    'Change': row['Change']
-                })
-
-        # 결과 출력
-        for item in high_volatility_days:
-            logging.info(f"Code: {item['Code']}, Date: {item['Date']}, Change: {item['Change']}%")
-        
-        return high_volatility_days
+            if not high_volatility.empty:
+                high_volatility_file = f"/tmp/{code}_high_volatility.csv"
+                high_volatility.to_csv(high_volatility_file, index=False)
+                
+                # S3에 업로드
+                s3_key = f'newb_data/stock_data/{code}_high_volatility.csv'
+                s3_hook.load_file(filename=high_volatility_file, key=s3_key, bucket_name=s3_bucket, replace=True)
+                logging.info(f"Successfully uploaded {s3_key} to S3")
 
     top_3_codes = read_csv_from_s3()
     local_files = fetch_csv_files(top_3_codes)

@@ -32,7 +32,7 @@ def exchange_rate_etl():
         data = response.json()
 
         # 데이터를 CSV 파일로 저장
-        file_path = '/tmp/bank_of_kroea/KeyStatisticList.csv'
+        file_path = '/tmp/KeyStatisticList.csv'
         fieldnames = ["STAT_CODE", "STAT_NAME", "ITEM_CODE1", "ITEM_NAME1", "ITEM_CODE2", "ITEM_NAME2", 
                       "ITEM_CODE3", "ITEM_NAME3", "ITEM_CODE4", "ITEM_NAME4", "UNIT_NAME", "WGT", "TIME", "DATA_VALUE"]
         
@@ -46,9 +46,9 @@ def exchange_rate_etl():
 
     @task(task_id="upload_to_s3")
     def upload_to_s3(file_path: str):
-        s3_hook = S3Hook(aws_conn_id='aws_default')
+        s3_hook = S3Hook(aws_conn_id='s3_conn')
         s3_bucket = 'team-won-2-bucket'
-        s3_key = 'newb_data/ExchangeRate.csv'
+        s3_key = 'newb_data/bank_of_korea/ExchangeRate.csv'
         s3_hook.load_file(file_path, s3_key, bucket_name=s3_bucket, replace=True)
         return f"s3://{s3_bucket}/{s3_key}"
 

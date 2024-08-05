@@ -43,7 +43,7 @@ def gdp_etl():
             response = requests.get(url)
             data = response.json()
 
-            file_path = f'/tmp/bank_of_kroea/GDP/{country_name}.csv'
+            file_path = f'/tmp/GDP/{country_name}.csv'
             fieldnames = ["STAT_CODE", "STAT_NAME", "ITEM_CODE1", "ITEM_NAME1", "ITEM_CODE2", "ITEM_NAME2", 
                             "ITEM_CODE3", "ITEM_NAME3", "ITEM_CODE4", "ITEM_NAME4", "UNIT_NAME", "WGT", "TIME", "DATA_VALUE"]
             
@@ -59,12 +59,12 @@ def gdp_etl():
 
     @task(task_id="upload_to_s3")
     def upload_to_s3(file_paths: list):
-        s3_hook = S3Hook(aws_conn_id='aws_default')
+        s3_hook = S3Hook(aws_conn_id='s3_conn')
         s3_bucket = 'team-won-2-bucket'
 
         for file_path in file_paths:
             country_name = os.path.basename(file_path).split('_')[0]
-            s3_key = f'newb_data/{country_name}_GDP.csv'
+            s3_key = f'newb_data/bank_of_korea/{country_name}_GDP.csv'
             s3_hook.load_file(file_path, s3_key, bucket_name=s3_bucket, replace=True)
 
     # 태스크 실행 및 의존성 설정
