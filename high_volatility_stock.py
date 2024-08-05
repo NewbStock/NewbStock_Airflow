@@ -59,6 +59,37 @@ def stock_top3():
                 logging.info(f"Successfully processed {file_key}")
             except Exception as e:
                 logging.error(f"Error reading file {file_key} from S3: {e}")
+            
+            return local_files
+        
+    
+    @task(task_id="find_max_change_date")
+    def find_max_change_date(local_files):
+        max_change_dates = []
+        
+        for file_path in local_files:
+            df = pd.read_csv(file_path)
+            
+            # 변동률 계산
+            df['Close'] = df['Close'].astype(float)
+            df['Prev_Close'] = df['Close'].shift(1)
+            df['Change'] = (df['Close'] - df['Prev_Close']) / df['Prev_Close'] * 100
+
+            # 변동률이 가장 큰 날짜 찾기
+            max_change_row = df.loc[df['Change'].idxmax()]
+            max_change_info = {
+                'Code': df['Code'].iloc[0],
+                'Date': max_change_row['Date'],
+                'Change': max_change_row['Change']
+            }
+            max_change_dates.append(max_change_info)
+            logging.info(f"Code: {df['Code'].iloc[0]}, 변동률이 가장 큰 날짜: {max_change_row['Date']}, 변동률: {max_change_row['Change']}%")
+
+        return max_change_dates
+
+    top_3_codes = read_csv_from_s3()
+    local_files = fetch_csv_files(top_3_codes)
+    find_max_change_date(local_files)
 
     top_3_codes = read_csv_from_s3()
     fetch_csv_files(top_3_codes)
