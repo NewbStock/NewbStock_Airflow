@@ -44,7 +44,7 @@ def stock_top3():
     def fetch_csv_files(top_3_codes):
         s3_hook = S3Hook(aws_conn_id='s3_conn')
         s3_bucket = 'team-won-2-bucket'
-        s3_key = 'newb_data/stock_data/stock_high_volatillity.csv'
+        s3_key = f'newb_data/stock_data/{code}.csv'
 
         for code in top_3_codes:
             file_key = f'us_stock_data/history/{code}.csv'
@@ -58,7 +58,6 @@ def stock_top3():
                 
                 # S3에 업로드
                 s3_hook.load_file(filename=temp_csv, key=s3_key, bucket_name=s3_bucket, replace=True)
-                logging.info(f"Successfully processed {file_key}")
             except Exception as e:
                 logging.error(f"Error reading file {file_key} from S3: {e}")
 
