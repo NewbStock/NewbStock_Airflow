@@ -54,7 +54,7 @@ def kospi_etl():
         # S3에 파일 업로드
         s3_hook = S3Hook(aws_conn_id='s3_conn')
         s3_bucket = 'team-won-2-bucket'
-        s3_key = 'newb_data/bank_of_korea/KOSPI.csv'
+        s3_key = 'newb_data/bank_of_korea/raw_data/KOSPI.csv'
         s3_hook.load_file(file_path, s3_key, bucket_name=s3_bucket, replace=True)
         return f"s3://{s3_bucket}/{s3_key}"
 

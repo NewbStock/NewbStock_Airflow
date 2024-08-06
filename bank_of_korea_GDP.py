@@ -64,7 +64,7 @@ def gdp_etl():
 
         for file_path in file_paths:
             country_name = os.path.basename(file_path).split('_')[0]
-            s3_key = f'newb_data/bank_of_korea/gdp/{country_name}_GDP.csv'
+            s3_key = f'newb_data/bank_of_korea/raw_data/gdp/{country_name}_GDP.csv'
             s3_hook.load_file(file_path, s3_key, bucket_name=s3_bucket, replace=True)
 
     # 태스크 실행 및 의존성 설정

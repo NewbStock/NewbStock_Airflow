@@ -73,10 +73,10 @@ def interest_rate_etl():
         s3_hook = S3Hook(aws_conn_id='s3_conn')
         s3_bucket = 'team-won-2-bucket'
         
-        s3_key1 = 'newb_data/bank_of_korea/InterRate_part1.csv'
+        s3_key1 = 'newb_data/bank_of_korea/raw_data/InterRate_part1.csv'
         s3_hook.load_file(file_path1, s3_key1, bucket_name=s3_bucket, replace=True)
         
-        s3_key2 = 'newb_data/bank_of_korea/InterRate_part2.csv'
+        s3_key2 = 'newb_data/bank_of_korea/raw_data/InterRate_part2.csv'
         s3_hook.load_file(file_path2, s3_key2, bucket_name=s3_bucket, replace=True)
         
         return [f"s3://{s3_bucket}/{s3_key1}", f"s3://{s3_bucket}/{s3_key2}"]
