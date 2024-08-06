@@ -1,10 +1,14 @@
 import csv
 import requests
+import logging
 from datetime import datetime, timedelta
+from io import StringIO, BytesIO
 from airflow.decorators import task, dag
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
-from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
+import pandas as pd
+import os
 
+# 기본 인자 설정
 default_args = {
     'owner': 'airflow',
     'depends_on_past': False,
@@ -23,10 +27,10 @@ default_args = {
     catchup=False
 )
 def exchange_rate_etl():
+
     @task(task_id="fetch_data")
     def fetch_data():
         end_date = datetime.now().strftime('%Y%m%d')
-
         url = f"https://ecos.bok.or.kr/api/StatisticSearch/GZJ2WT8Y559OMJKLPMRQ/json/kr/1/100000/731Y003/D/19210101/{end_date}"
         response = requests.get(url)
         data = response.json()
@@ -52,8 +56,38 @@ def exchange_rate_etl():
         s3_hook.load_file(file_path, s3_key, bucket_name=s3_bucket, replace=True)
         return f"s3://{s3_bucket}/{s3_key}"
 
+    @task(task_id="process_data")
+    def process_data(raw_s3_path: str):
+        s3_hook = S3Hook(aws_conn_id='s3_conn')
+        s3_bucket, s3_key = raw_s3_path.replace('s3://', '').split('/', 1)
 
-    file_paths = fetch_data()
-    upload_to_s3(file_paths)
+        try:
+            obj = s3_hook.get_key(s3_key, s3_bucket)
+            csv_content = obj.get()["Body"].read()
+            df = pd.read_csv(BytesIO(csv_content), encoding='utf-8-sig')
+
+            # 필요한 데이터 전처리 수행
+            df_pivot = df.pivot_table(index='TIME', columns='ITEM_NAME1', values='DATA_VALUE', aggfunc='first').reset_index()
+
+            processed_file_path = '/tmp/ProcessedExchangeRateData.csv'
+            df_pivot.to_csv(processed_file_path, index=False, encoding='utf-8-sig')
+
+            return processed_file_path
+        except Exception as e:
+            logging.error(f"Error reading file {s3_key} from S3: {e}")
+            raise
+
+    @task(task_id="upload_processed_to_s3")
+    def upload_processed_to_s3(file_path: str):
+        s3_hook = S3Hook(aws_conn_id='s3_conn')
+        s3_bucket = 'team-won-2-bucket'
+        s3_key = 'newb_data/bank_of_korea/processed/ProcessedExchangeRateData.csv'
+        s3_hook.load_file(file_path, s3_key, bucket_name=s3_bucket, replace=True)
+        return f"s3://{s3_bucket}/{s3_key}"
+
+    file_path = fetch_data()
+    raw_s3_path = upload_to_s3(file_path)
+    processed_file_path = process_data(raw_s3_path)
+    upload_processed_to_s3(processed_file_path)
 
 dag = exchange_rate_etl()
