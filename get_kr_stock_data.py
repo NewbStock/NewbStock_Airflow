@@ -8,7 +8,8 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 from airflow.providers.postgres.hooks.postgres import PostgresHook
-from airflow.providers.amazon.aws.operators.glue import AwsGlueJobOperator
+#from airflow.providers.amazon.aws.operators.glue import AwsGlueJobOperator
+from airflow.providers.amazon.aws.operators.glue import GlueJobOperator
 import FinanceDataReader as fdr
 import pandas as pd
 from datetime import datetime
@@ -133,6 +134,7 @@ with DAG (
         dag=dag,
     )
 
+    """
     run_glue_job = AwsGlueJobOperator(
         task_id='kr_stock_data_glue_job',
         job_name='newbstock_kr_stock_data_s3_to_redshift',
@@ -140,5 +142,14 @@ with DAG (
         iam_role_name='newbstock_glue_role',
         dag=dag
     )
-
-    process_and_upload_stock_data_task >> run_glue_job
+    """
+    
+    run_glue_job_task = GlueJobOperator(
+        task_id='kr_stock_data_glue_job',
+        job_name='newbstock_kr_stock_data_s3_to_redshift',
+        script_location='s3://aws-glue-assets-862327261051-ap-northeast-2/scripts/newbstock_kr_stock_datat_s3_to_redshift.py',  # Glue Job에 필요한 스크립트 경로
+        region_name='ap-northeast-2',
+        iam_role_name='newbstock_glue_role',
+        dag=dag
+    )
+    process_and_upload_stock_data_task >> run_glue_job_task
