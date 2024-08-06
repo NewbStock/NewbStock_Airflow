@@ -21,7 +21,7 @@ default_args = {
 @dag(
     dag_id='interest_rate_etl_dag',
     default_args=default_args,
-    description='한국 금리',
+    description='한국 금리 ETL',
     schedule_interval=timedelta(days=1),
     start_date=datetime(2023, 1, 1),
     catchup=False
@@ -40,7 +40,7 @@ def interest_rate_etl():
         fieldnames = ["STAT_CODE", "STAT_NAME", "ITEM_CODE1", "ITEM_NAME1", "ITEM_CODE2", "ITEM_NAME2", 
                       "ITEM_CODE3", "ITEM_NAME3", "ITEM_CODE4", "ITEM_NAME4", "UNIT_NAME", "WGT", "TIME", "DATA_VALUE"]
         
-        with open(file_path, mode='w', newline='', encoding='utf-8-sig') as file:
+        with open(file_path, mode='w', newline='', encoding='utf-8') as file:
             writer = csv.DictWriter(file, fieldnames=fieldnames)
             writer.writeheader()
             for row in data.get('StatisticSearch', {}).get('row', []):
@@ -58,22 +58,21 @@ def interest_rate_etl():
         return f"s3://{s3_bucket}/{s3_key}"
 
     @task(task_id="process_data")
-    def process_data():
+    def process_data(raw_s3_path: str):
         s3_hook = S3Hook(aws_conn_id='s3_conn')
-        s3_bucket = 'team-won-2-bucket'
-        s3_key = 'newb_data/bank_of_korea/InterRate.csv'
+        s3_bucket, s3_key = raw_s3_path.replace('s3://', '').split('/', 1)
 
         try:
             obj = s3_hook.get_key(s3_key, s3_bucket)
             csv_content = obj.get()["Body"].read()
-            # 우선 ISO-8859-1로 읽어봄
-            df = pd.read_csv(BytesIO(csv_content), encoding='ISO-8859-1')
+            # 우선 utf-8로 읽어봄
+            df = pd.read_csv(BytesIO(csv_content), encoding='utf-8')
 
             # 필요한 데이터 전처리 수행
             df_pivot = df.pivot_table(index='TIME', columns='ITEM_NAME1', values='DATA_VALUE', aggfunc='first').reset_index()
 
             processed_file_path = '/tmp/ProcessedMarketInterestRateData.csv'
-            df_pivot.to_csv(processed_file_path, index=False, encoding='utf-8-sig')
+            df_pivot.to_csv(processed_file_path, index=False, encoding='utf-8')
 
             return processed_file_path
         except Exception as e:
@@ -90,7 +89,7 @@ def interest_rate_etl():
 
     raw_file_path = fetch_data()
     raw_s3_path = upload_raw_to_s3(raw_file_path)
-    processed_file_path = process_data()
+    processed_file_path = process_data(raw_s3_path)
     upload_processed_to_s3(processed_file_path)
 
 dag = interest_rate_etl()
