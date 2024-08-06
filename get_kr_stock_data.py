@@ -83,7 +83,7 @@ def update_stock_data():
                 new_record = fdr.DataReader(f'KRX:{company_code}', datetime.today().date())  # UTC, KST 주의
                 df = pd.concat([existing_df, new_record])            
             else:
-                df = fdr.DataReader(f'KRX:{company_code}', start_date = '2000-01-01')        
+                df = fdr.DataReader(f'KRX:{company_code}', start = '2000-01-01')        
             
 
             df.index.name = 'Date'  # 인덱스 이름 설정
