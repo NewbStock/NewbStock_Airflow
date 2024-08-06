@@ -48,8 +48,8 @@ def exchange_rate_etl():
 
         return file_path
 
-    @task(task_id="upload_to_s3")
-    def upload_to_s3(file_path: str):
+    @task(task_id="upload_raw_to_s3")
+    def upload_raw_to_s3(file_path: str):
         s3_hook = S3Hook(aws_conn_id='s3_conn')
         s3_bucket = 'team-won-2-bucket'
         s3_key = 'newb_data/bank_of_korea/ExchangeRate.csv'
@@ -86,7 +86,7 @@ def exchange_rate_etl():
         return f"s3://{s3_bucket}/{s3_key}"
 
     file_path = fetch_data()
-    raw_s3_path = upload_to_s3(file_path)
+    raw_s3_path = upload_raw_to_s3(file_path)
     processed_file_path = process_data(raw_s3_path)
     upload_processed_to_s3(processed_file_path)
 
