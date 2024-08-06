@@ -1,8 +1,11 @@
 import csv
 import requests
+import logging
 from datetime import datetime, timedelta
+from io import StringIO, BytesIO
 from airflow.decorators import task, dag
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+import pandas as pd
 import os
 
 # 기본 인자 설정
@@ -28,7 +31,6 @@ def interest_rate_etl():
     @task(task_id="fetch_data")
     def fetch_data():
         end_date = datetime.now().strftime('%Y%m%d')
-
         url = f"https://ecos.bok.or.kr/api/StatisticSearch/GZJ2WT8Y559OMJKLPMRQ/json/kr/1/99999/817Y002/D/20100101/{end_date}"
         response = requests.get(url)
         data = response.json()
@@ -46,17 +48,49 @@ def interest_rate_etl():
 
         return file_path
 
-
-    @task(task_id="upload_to_s3")
-    def upload_to_s3(file_path: str):
+    @task(task_id="upload_raw_to_s3")
+    def upload_raw_to_s3(file_path: str):
         # S3에 파일 업로드
         s3_hook = S3Hook(aws_conn_id='s3_conn')
         s3_bucket = 'team-won-2-bucket'
         s3_key = 'newb_data/bank_of_korea/InterRate.csv'
         s3_hook.load_file(file_path, s3_key, bucket_name=s3_bucket, replace=True)
+        return f"s3://{s3_bucket}/{s3_key}"
 
-    # 태스크 실행 및 의존성 설정
-    file_paths = fetch_data()
-    upload_to_s3(file_paths)
+    @task(task_id="process_data")
+    def process_data():
+        s3_hook = S3Hook(aws_conn_id='s3_conn')
+        s3_bucket = 'team-won-2-bucket'
+        s3_key = 'newb_data/bank_of_korea/InterRate.csv'
+
+        try:
+            obj = s3_hook.get_key(s3_key, s3_bucket)
+            csv_content = obj.get()["Body"].read()
+            # 우선 ISO-8859-1로 읽어봄
+            df = pd.read_csv(BytesIO(csv_content), encoding='ISO-8859-1')
+
+            # 필요한 데이터 전처리 수행
+            df_pivot = df.pivot_table(index='TIME', columns='ITEM_NAME1', values='DATA_VALUE', aggfunc='first').reset_index()
+
+            processed_file_path = '/tmp/ProcessedMarketInterestRateData.csv'
+            df_pivot.to_csv(processed_file_path, index=False, encoding='utf-8-sig')
+
+            return processed_file_path
+        except Exception as e:
+            logging.error(f"Error reading file {s3_key} from S3: {e}")
+            raise
+
+    @task(task_id="upload_processed_to_s3")
+    def upload_processed_to_s3(file_path: str):
+        s3_hook = S3Hook(aws_conn_id='s3_conn')
+        s3_bucket = 'team-won-2-bucket'
+        s3_key = 'newb_data/bank_of_korea/ProcessedMarketInterestRateData.csv'
+        s3_hook.load_file(file_path, s3_key, bucket_name=s3_bucket, replace=True)
+        return f"s3://{s3_bucket}/{s3_key}"
+
+    raw_file_path = fetch_data()
+    raw_s3_path = upload_raw_to_s3(raw_file_path)
+    processed_file_path = process_data()
+    upload_processed_to_s3(processed_file_path)
 
 dag = interest_rate_etl()
