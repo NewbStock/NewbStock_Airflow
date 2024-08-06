@@ -147,7 +147,7 @@ with DAG (
     run_glue_job_task = GlueJobOperator(
         task_id='kr_stock_data_glue_job',
         job_name='newbstock_kr_stock_data_s3_to_redshift',
-        script_location='s3://aws-glue-assets-862327261051-ap-northeast-2/scripts/newbstock_kr_stock_datat_s3_to_redshift.py',  # Glue Job에 필요한 스크립트 경로
+        script_location='s3://aws-glue-assets-862327261051-ap-northeast-2/scripts/newbstock_kr_stock_data_s3_to_redshift.py',  # Glue Job에 필요한 스크립트 경로
         region_name='ap-northeast-2',
         iam_role_name='newbstock_glue_role',
         dag=dag
