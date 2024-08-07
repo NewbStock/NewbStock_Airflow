@@ -83,7 +83,7 @@ def update_stock_data():
                 new_record = fdr.DataReader(f'KRX:{company_code}', datetime.today().date())  # UTC, KST 주의
                 df = pd.concat([existing_df, new_record])            
             else:
-                df = fdr.DataReader(f'KRX:{company_code}', start_date = '2000-01-01')        
+                df = fdr.DataReader(f'KRX:{company_code}', start = '2000-01-01')        
             
 
             df.index.name = 'Date'  # 인덱스 이름 설정
@@ -120,7 +120,7 @@ default_args = {
 }
 
 with DAG ( 
-    dag_id='get_kr_marketcap_top100',
+    dag_id='get_kr_stock_data',
     default_args=default_args,
     description='With FinanceDataReader, download, process, and upload KOSPI Marketcap Top100 data to S3',
     schedule_interval='30 9 * * 1-5',  # UTC 09:30 (KST 18:30), 월요일부터 금요일까지 장 마감 후  
@@ -147,7 +147,7 @@ with DAG (
     run_glue_job_task = GlueJobOperator(
         task_id='kr_stock_data_glue_job',
         job_name='newbstock_kr_stock_data_s3_to_redshift',
-        script_location='s3://aws-glue-assets-862327261051-ap-northeast-2/scripts/newbstock_kr_stock_datat_s3_to_redshift.py',  # Glue Job에 필요한 스크립트 경로
+        script_location='s3://aws-glue-assets-862327261051-ap-northeast-2/scripts/newbstock_kr_stock_data_s3_to_redshift.py',  # Glue Job에 필요한 스크립트 경로
         region_name='ap-northeast-2',
         iam_role_name='newbstock_glue_role',
         dag=dag
