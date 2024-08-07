@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from io import BytesIO
 from airflow.decorators import task, dag
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
-from airflow.providers.amazon.aws.operators.glue import GlueJobOperator
+from airflow.providers.amazon.aws.operators.glue import AwsGlueJobOperator
 import pandas as pd
 
 # 기본 인자 설정
@@ -88,14 +88,13 @@ def kospi_etl():
         return f"s3://{s3_bucket}/{s3_key}"
 
     # AWS Glue Job 실행 태스크
-    glue_job_task = GlueJobOperator(
+    glue_job_task = AwsGlueJobOperator(
         task_id='run_glue_job',
-        job_name='newbstock_transform_glue',  # AWS Glue 콘솔에 설정된 Glue 작업 이름
-        script_location='s3://team-won-2-glue-bucket/glue/newbstock_transform_glue.py',  # Glue 작업에 사용될 스크립트의 S3 경로
+        job_name='newbstock_trasform_glue',  # AWS Glue 콘솔에 설정된 Glue 작업 이름
+        script_location='s3://team-won-2-glue-bucket/newbstock_trasform_glue.py',  # Glue 작업에 사용될 스크립트의 S3 경로
         aws_conn_id='aws_default',
         region_name='ap-northeast-2',
-        retries=1,
-        retry_delay=timedelta(minutes=5),
+        dag=dag,
     )
 
     file_path = fetch_data()
