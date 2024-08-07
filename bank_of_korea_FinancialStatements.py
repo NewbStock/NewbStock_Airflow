@@ -7,7 +7,7 @@ import os
 
 # 기본 인자 설정
 default_args = {
-    'owner': 'airflow',
+    'owner': 'leeseungjun',
     'depends_on_past': False,
     'email_on_failure': False,
     'email_on_retry': False,
