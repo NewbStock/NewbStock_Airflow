@@ -87,19 +87,19 @@ def kospi_etl():
         s3_hook.load_file(file_path, s3_key, bucket_name=s3_bucket, replace=True)
         return f"s3://{s3_bucket}/{s3_key}"
 
-    # AWS Glue Job 실행 태스크
-    glue_job_task = GlueJobOperator(
-        task_id='run_glue_job',
-        job_name='newbstock_trasform_glue',  # AWS Glue 콘솔에 설정된 Glue 작업 이름
-        script_location='s3://team-won-2-glue-bucket/newbstock_trasform_glue.py',  # Glue 작업에 사용될 스크립트의 S3 경로
-        aws_conn_id='aws_default',
-        region_name='ap-northeast-2'
-    )
-
+    # 각 태스크를 호출하고 종속성을 설정합니다.
     file_path = fetch_data()
     raw_s3_path = upload_raw_to_s3(file_path)
     processed_file_path = process_data(raw_s3_path)
     processed_s3_path = upload_processed_to_s3(processed_file_path)
+
+    glue_job_task = GlueJobOperator(
+        task_id='run_glue_job',
+        job_name='newbstock_newb_transform_glue',  # AWS Glue 콘솔에 설정된 Glue 작업 이름
+        script_location='s3://team-won-2-glue-bucket/newbstock_trasform_glue.py',  # Glue 작업에 사용될 스크립트의 S3 경로
+        aws_conn_id='aws_default',
+        region_name='ap-northeast-2'
+    )
 
     processed_s3_path >> glue_job_task
 
