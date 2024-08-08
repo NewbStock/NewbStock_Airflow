@@ -17,14 +17,14 @@ default_args = {
 }
 
 @dag(
-    dag_id='high_volatility_stock',
+    dag_id='high_volatility_us_stock',
     default_args=default_args,
     description='Fetch and process exchange rate data for beginner stock investors',
     schedule_interval=timedelta(days=1),
     start_date=datetime(2023, 1, 1),
     catchup=False
 )
-def high_volatility_stock():
+def high_volatility_us_stock():
 
     @task(task_id="read_csv_from_s3")
     def read_csv_from_s3():
@@ -82,7 +82,7 @@ def high_volatility_stock():
                     high_volatility.to_csv(high_volatility_file, index=False)
                     
                     # S3에 업로드
-                    s3_key = f'newb_data/stock_data/{code}_high_volatility.csv'
+                    s3_key = f'newb_data/stock_data/us/{code}_high_volatility.csv'
                     s3_hook.load_file(filename=high_volatility_file, key=s3_key, bucket_name=s3_bucket, replace=True)
                     logging.info(f"Successfully uploaded {s3_key} to S3")
                 else:
@@ -94,4 +94,4 @@ def high_volatility_stock():
     local_files = fetch_csv_files(top_100_codes)
     find_high_volatility_days(local_files)
 
-dag = high_volatility_stock()
+dag = high_volatility_us_stock()
