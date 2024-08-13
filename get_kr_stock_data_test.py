@@ -42,18 +42,34 @@ def update_stock_data():
 
     # 한국 시장 시가총액 100위 데이터 가져오기
     kr_top100 = get_kr_top100()
+    
     if kr_top100 is None:
         logging.error("Failed to get kr_top100 data. Aborting.")
         return
-    
-  
+
+    # Avro 스키마 정의
+    avro_schema = {
+        "type": "record",
+        "name": "StockData",
+        "fields": [
+            {"name": "Date", "type": "string"},
+            {"name": "Open", "type": ["float", "null"]},
+            {"name": "High", "type": ["float", "null"]},
+            {"name": "Low", "type": ["float", "null"]},
+            {"name": "Close", "type": ["float", "null"]},
+            {"name": "Volume", "type": ["float", "null"]},
+            {"name": "Change", "type": ["float", "null"]},
+            {"name": "name", "type": "string"},
+            {"name": "code", "type": "string"}
+        ]
+    }
 
     # 현재 top 100 기업의 데이터 업데이트 또는 새로 생성
     for _, company in kr_top100.iterrows():
         company_name = company['CompanyName']
         company_code = str(company['CompanyCode']).zfill(6)
-        key = f'kr_stock_data/parquet/{company_code}.parquet'
-        #key = f'kr_stock_data/orc/{company_code}.json'
+        #key = f'kr_stock_data/parquet/{company_code}.parquet'
+        key = f'kr_stock_data/orc/{company_code}.orc'
         #key = f'kr_stock_data/avro/{company_code}.json'
 
         try:
@@ -67,25 +83,6 @@ def update_stock_data():
             # FinanceDataReader 컬럼
             # Date, Open, High, Low, Close, Volume, Change, Updown, Comp, Amount, MarCap, Shares
             if not df.empty:
-                """
-                # ORC 포맷 저장 
-                # Pandas DataFrame을 PyArrow Table로 변환
-                table = pa.Table.from_pandas(df)
-
-                # ORC로 변환하여 S3에 저장
-                orc_buffer = BytesIO()
-                orc_writer = orc.ORCWriter(orc_buffer)
-                orc_writer.write(table)
-                orc_writer.close()
-
-                s3_hook.load_bytes(
-                    bytes_data=orc_buffer.getvalue(),
-                    key=key,
-                    bucket_name=bucket_name,
-                    replace=True
-                )
-                """
-                
                 """
                 # Avro 포맷 저장
                 # Convert DataFrame to list of dictionaries
@@ -103,8 +100,27 @@ def update_stock_data():
                     replace=True
                 )
                 """
+                
+                
+                # ORC 포맷 저장 
+                # Pandas DataFrame을 PyArrow Table로 변환
+                table = pa.Table.from_pandas(df)
 
+                # ORC로 변환하여 S3에 저장
+                orc_buffer = BytesIO()
+                orc_writer = orc.ORCWriter(orc_buffer)
+                orc_writer.write(table)
+                orc_writer.close()
 
+                s3_hook.load_bytes(
+                    bytes_data=orc_buffer.getvalue(),
+                    key=key,
+                    bucket_name=bucket_name,
+                    replace=True
+                )
+
+                
+                """
                 # Parquet 포맷 저장
                 # Convert DataFrame to PyArrow Table
                 table = pa.Table.from_pandas(df)
@@ -119,9 +135,9 @@ def update_stock_data():
                     bucket_name=bucket_name,
                     replace=True
                 )
-
-                logging.info(f"Successfully saved Parquet data for {company_name} {company_code}")
-                #logging.info(f"Successfully saved ORC data for {company_name} {company_code}")
+                """
+                logging.info(f"Successfully saved ORC data for {company_name} {company_code}")
+                #logging.info(f"Successfully saved Parquet data for {company_name} {company_code}")
                 #logging.info(f"Successfully saved Avro data for {company_name} {company_code}")
 
             else:
