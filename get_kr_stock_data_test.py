@@ -14,6 +14,7 @@ import logging
 from io import StringIO, BytesIO
 import pyarrow as pa
 import pyarrow.parquet as pq
+import pyarrow.orc as orc
 
 
 # S3에서 'kr_top100.csv' (오늘 시가총액 top100) 데이터 가져오기
@@ -52,8 +53,8 @@ def update_stock_data():
     for _, company in kr_top100.iterrows():
         company_name = company['CompanyName']
         company_code = str(company['CompanyCode']).zfill(6)
-        key = f'kr_stock_data/parquet/{company_code}.csv'
-        #company_code = str(company['code']).zfill(6)  # 'code' 컬럼의 값을 6자리로 맞추기 (앞에 0 추가)
+        #key = f'kr_stock_data/parquet/{company_code}.csv'
+        key = f'kr_stock_data/orc/{company_code}.csv'
 
         try:
             df = fdr.DataReader(f'KRX:{company_code}', start = '2000-01-01')        
