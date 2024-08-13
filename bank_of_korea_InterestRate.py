@@ -2,42 +2,46 @@ import csv
 import requests
 import logging
 from datetime import datetime, timedelta
-from io import StringIO, BytesIO
+from io import BytesIO
 from airflow.decorators import task, dag
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 import pandas as pd
-import os
 
-# 기본 인자 설정
+# 기본 DAG 인자 설정
 default_args = {
-    'owner': 'airflow',
-    'depends_on_past': False,
-    'email_on_failure': False,
-    'email_on_retry': False,
-    'retries': 1,
-    'retry_delay': timedelta(minutes=5),
+    'owner': 'seungjun', 
+    'depends_on_past': False,  
+    'email_on_failure': False,  
+    'email_on_retry': False,  
+    'retries': 1,  
+    'retry_delay': timedelta(minutes=5),  
 }
 
 @dag(
     dag_id='interest_rate_etl_dag',
     default_args=default_args,
-    description='한국 금리 ETL',
+    description='한국 금리 데이터를 수집, 처리 및 S3에 업로드하는 ETL DAG',
     schedule_interval=timedelta(days=1),
     start_date=datetime(2023, 1, 1),
     catchup=False
 )
 def interest_rate_etl():
+    """한국 금리 데이터를 수집하여 S3에 저장하고 처리하는 ETL 작업을 정의하는 DAG"""
 
     @task(task_id="fetch_data_part1")
     def fetch_data_part1():
+        """첫 번째 기간(1995-2010) 동안의 금리 데이터를 가져와 로컬에 CSV로 저장"""
         url = "https://ecos.bok.or.kr/api/StatisticSearch/GZJ2WT8Y559OMJKLPMRQ/json/kr/1/99999/817Y002/D/19950103/20100101"
         response = requests.get(url)
         data = response.json()
 
         # 데이터를 CSV 파일로 저장
         file_path = '/tmp/KeyStatisticList_part1.csv'
-        fieldnames = ["STAT_CODE", "STAT_NAME", "ITEM_CODE1", "ITEM_NAME1", "ITEM_CODE2", "ITEM_NAME2", 
-                      "ITEM_CODE3", "ITEM_NAME3", "ITEM_CODE4", "ITEM_NAME4", "UNIT_NAME", "WGT", "TIME", "DATA_VALUE"]
+        fieldnames = [
+            "STAT_CODE", "STAT_NAME", "ITEM_CODE1", "ITEM_NAME1", "ITEM_CODE2", 
+            "ITEM_NAME2", "ITEM_CODE3", "ITEM_NAME3", "ITEM_CODE4", "ITEM_NAME4", 
+            "UNIT_NAME", "WGT", "TIME", "DATA_VALUE"
+        ]
         
         with open(file_path, mode='w', newline='', encoding='utf-8-sig') as file:
             writer = csv.DictWriter(file, fieldnames=fieldnames)
@@ -49,6 +53,7 @@ def interest_rate_etl():
 
     @task(task_id="fetch_data_part2")
     def fetch_data_part2():
+        """두 번째 기간(2010-현재) 동안의 금리 데이터를 가져와 로컬에 CSV로 저장"""
         end_date = datetime.now().strftime('%Y%m%d')
         url = f"https://ecos.bok.or.kr/api/StatisticSearch/GZJ2WT8Y559OMJKLPMRQ/json/kr/1/99999/817Y002/D/20100102/{end_date}"
         response = requests.get(url)
@@ -56,8 +61,11 @@ def interest_rate_etl():
 
         # 데이터를 CSV 파일로 저장
         file_path = '/tmp/KeyStatisticList_part2.csv'
-        fieldnames = ["STAT_CODE", "STAT_NAME", "ITEM_CODE1", "ITEM_NAME1", "ITEM_CODE2", "ITEM_NAME2", 
-                      "ITEM_CODE3", "ITEM_NAME3", "ITEM_CODE4", "ITEM_NAME4", "UNIT_NAME", "WGT", "TIME", "DATA_VALUE"]
+        fieldnames = [
+            "STAT_CODE", "STAT_NAME", "ITEM_CODE1", "ITEM_NAME1", "ITEM_CODE2", 
+            "ITEM_NAME2", "ITEM_CODE3", "ITEM_NAME3", "ITEM_CODE4", "ITEM_NAME4", 
+            "UNIT_NAME", "WGT", "TIME", "DATA_VALUE"
+        ]
         
         with open(file_path, mode='w', newline='', encoding='utf-8-sig') as file:
             writer = csv.DictWriter(file, fieldnames=fieldnames)
@@ -69,7 +77,7 @@ def interest_rate_etl():
 
     @task(task_id="upload_raw_to_s3")
     def upload_raw_to_s3(file_path1: str, file_path2: str):
-        # S3에 파일 업로드
+        """두 기간의 원시 데이터를 S3 버킷에 업로드"""
         s3_hook = S3Hook(aws_conn_id='s3_conn')
         s3_bucket = 'team-won-2-bucket'
         
@@ -83,6 +91,7 @@ def interest_rate_etl():
 
     @task(task_id="process_data")
     def process_data(raw_s3_paths: list):
+        """S3에서 원시 데이터를 다운로드하고 결합한 후 처리"""
         s3_hook = S3Hook(aws_conn_id='s3_conn')
         dfs = []
         
@@ -102,7 +111,12 @@ def interest_rate_etl():
         combined_df = pd.concat(dfs)
 
         # 필요한 데이터 전처리 수행
-        df_pivot = combined_df.pivot_table(index='TIME', columns='ITEM_NAME1', values='DATA_VALUE', aggfunc='first').reset_index()
+        df_pivot = combined_df.pivot_table(
+            index='TIME', 
+            columns='ITEM_NAME1', 
+            values='DATA_VALUE', 
+            aggfunc='first'
+        ).reset_index()
 
         processed_file_path = '/tmp/ProcessedMarketInterestRateData.csv'
         df_pivot.to_csv(processed_file_path, index=False, encoding='utf-8-sig')
@@ -111,16 +125,19 @@ def interest_rate_etl():
 
     @task(task_id="upload_processed_to_s3")
     def upload_processed_to_s3(file_path: str):
+        """처리된 데이터를 S3 버킷에 업로드"""
         s3_hook = S3Hook(aws_conn_id='s3_conn')
         s3_bucket = 'team-won-2-bucket'
         s3_key = 'newb_data/bank_of_korea/processed/ProcessedMarketInterestRateData.csv'
         s3_hook.load_file(file_path, s3_key, bucket_name=s3_bucket, replace=True)
         return f"s3://{s3_bucket}/{s3_key}"
 
+    # DAG 실행 순서 정의
     file_path1 = fetch_data_part1()
     file_path2 = fetch_data_part2()
     raw_s3_paths = upload_raw_to_s3(file_path1, file_path2)
     processed_file_path = process_data(raw_s3_paths)
     upload_processed_to_s3(processed_file_path)
 
+# DAG 인스턴스 생성
 dag = interest_rate_etl()

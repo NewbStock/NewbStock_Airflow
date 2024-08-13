@@ -7,26 +7,27 @@ import pandas as pd
 import logging
 from io import StringIO
 
-# 기본 DAG 인자 설정
+
 default_args = {
-    'owner': 'airflow',
-    'depends_on_past': False,
-    'email_on_failure': False,
-    'email_on_retry': False,
-    'retries': 1,
-    'retry_delay': timedelta(minutes=5),
+    'owner': 'seungjun',  
+    'depends_on_past': False,  
+    'email_on_failure': False,  
+    'email_on_retry': False,  
+    'retries': 1,  
+    'retry_delay': timedelta(minutes=5),  
 }
 
-# DAG 정의
+
 @dag(
     dag_id='high_volatility_us_stock',
     default_args=default_args,
-    description='Fetch and process exchange rate data for beginner stock investors',
+    description='Fetch and process high volatility US stock data for beginner investors',
     schedule_interval=timedelta(days=1),
     start_date=datetime(2023, 1, 1),
     catchup=False
 )
 def high_volatility_us_stock():
+    """미국 주식 데이터를 수집하고 변동성이 큰 날을 분석하는 DAG"""
 
     @task(task_id="read_csv_from_s3")
     def read_csv_from_s3():

@@ -7,7 +7,7 @@ from io import StringIO
 
 # 기본 DAG 인자 설정
 default_args = {
-    'owner': 'airflow',
+    'owner': 'seungjun',
     'depends_on_past': False,
     'email_on_failure': False,
     'email_on_retry': False,

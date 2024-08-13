@@ -2,20 +2,19 @@ import csv
 import requests
 import logging
 from datetime import datetime, timedelta
-from io import StringIO, BytesIO
+from io import BytesIO
 from airflow.decorators import task, dag
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 import pandas as pd
-import os
 
 # 기본 인자 설정
 default_args = {
-    'owner': 'airflow',
-    'depends_on_past': False,
-    'email_on_failure': False,
-    'email_on_retry': False,
-    'retries': 1,
-    'retry_delay': timedelta(minutes=5),
+    'owner': 'seungjun',  
+    'depends_on_past': False,  
+    'email_on_failure': False,  
+    'email_on_retry': False,  
+    'retries': 1,  
+    'retry_delay': timedelta(minutes=5), 
 }
 
 @dag(
@@ -27,19 +26,27 @@ default_args = {
     catchup=False
 )
 def exchange_rate_etl():
+    """환율 데이터를 수집, 처리, S3에 업로드하는 ETL 작업을 수행하는 DAG"""
 
     @task(task_id="fetch_data")
     def fetch_data():
+        """API로부터 환율 데이터를 가져와 CSV 파일로 저장"""
         end_date = datetime.now().strftime('%Y%m%d')
-        url = f"https://ecos.bok.or.kr/api/StatisticSearch/GZJ2WT8Y559OMJKLPMRQ/json/kr/1/100000/731Y003/D/19210101/{end_date}"
+        url = (
+            f"https://ecos.bok.or.kr/api/StatisticSearch/"
+            f"GZJ2WT8Y559OMJKLPMRQ/json/kr/1/100000/731Y003/D/19210101/{end_date}"
+        )
         response = requests.get(url)
         data = response.json()
 
         # 데이터를 CSV 파일로 저장
         file_path = '/tmp/KeyStatisticList.csv'
-        fieldnames = ["STAT_CODE", "STAT_NAME", "ITEM_CODE1", "ITEM_NAME1", "ITEM_CODE2", "ITEM_NAME2", 
-                      "ITEM_CODE3", "ITEM_NAME3", "ITEM_CODE4", "ITEM_NAME4", "UNIT_NAME", "WGT", "TIME", "DATA_VALUE"]
-        
+        fieldnames = [
+            "STAT_CODE", "STAT_NAME", "ITEM_CODE1", "ITEM_NAME1", "ITEM_CODE2",
+            "ITEM_NAME2", "ITEM_CODE3", "ITEM_NAME3", "ITEM_CODE4", "ITEM_NAME4",
+            "UNIT_NAME", "WGT", "TIME", "DATA_VALUE"
+        ]
+
         with open(file_path, mode='w', newline='', encoding='utf-8-sig') as file:
             writer = csv.DictWriter(file, fieldnames=fieldnames)
             writer.writeheader()
@@ -50,6 +57,7 @@ def exchange_rate_etl():
 
     @task(task_id="upload_raw_to_s3")
     def upload_raw_to_s3(file_path: str):
+        """로컬에 저장된 원시 데이터를 S3 버킷에 업로드"""
         s3_hook = S3Hook(aws_conn_id='s3_conn')
         s3_bucket = 'team-won-2-bucket'
         s3_key = 'newb_data/bank_of_korea/raw_data/ExchangeRate.csv'
@@ -58,6 +66,7 @@ def exchange_rate_etl():
 
     @task(task_id="process_data")
     def process_data(raw_s3_path: str):
+        """S3에서 원시 데이터를 다운로드하여 처리 후 다시 S3에 저장"""
         s3_hook = S3Hook(aws_conn_id='s3_conn')
         s3_bucket, s3_key = raw_s3_path.replace('s3://', '').split('/', 1)
 
@@ -67,7 +76,12 @@ def exchange_rate_etl():
             df = pd.read_csv(BytesIO(csv_content), encoding='utf-8-sig')
 
             # 필요한 데이터 전처리 수행
-            df_pivot = df.pivot_table(index='TIME', columns='ITEM_NAME1', values='DATA_VALUE', aggfunc='first').reset_index()
+            df_pivot = df.pivot_table(
+                index='TIME', 
+                columns='ITEM_NAME1', 
+                values='DATA_VALUE', 
+                aggfunc='first'
+            ).reset_index()
 
             processed_file_path = '/tmp/ProcessedExchangeRateData.csv'
             df_pivot.to_csv(processed_file_path, index=False, encoding='utf-8-sig')
@@ -79,12 +93,14 @@ def exchange_rate_etl():
 
     @task(task_id="upload_processed_to_s3")
     def upload_processed_to_s3(file_path: str):
+        """처리된 데이터를 S3 버킷에 업로드"""
         s3_hook = S3Hook(aws_conn_id='s3_conn')
         s3_bucket = 'team-won-2-bucket'
         s3_key = 'newb_data/bank_of_korea/processed/ProcessedExchangeRateData.csv'
         s3_hook.load_file(file_path, s3_key, bucket_name=s3_bucket, replace=True)
         return f"s3://{s3_bucket}/{s3_key}"
 
+    # 태스크 호출 및 종속성 설정
     file_path = fetch_data()
     raw_s3_path = upload_raw_to_s3(file_path)
     processed_file_path = process_data(raw_s3_path)
