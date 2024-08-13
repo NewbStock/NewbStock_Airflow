@@ -13,7 +13,7 @@ from io import StringIO, BytesIO
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pyarrow.orc as orc
-#from fastavro import writer, parse_schema
+from fastavro import writer, parse_schema
 
 
 # S3에서 'kr_top100.csv' (오늘 시가총액 top100) 데이터 가져오기
@@ -69,8 +69,8 @@ def update_stock_data():
         company_name = company['CompanyName']
         company_code = str(company['CompanyCode']).zfill(6)
         #key = f'kr_stock_data/parquet/{company_code}.parquet'
-        key = f'kr_stock_data/orc/{company_code}.orc'
-        #key = f'kr_stock_data/avro/{company_code}.json'
+        #key = f'kr_stock_data/orc/{company_code}.orc'
+        key = f'kr_stock_data/avro/{company_code}.avro'
 
         try:
             df = fdr.DataReader(f'KRX:{company_code}', start = '2000-01-01')        
@@ -83,7 +83,7 @@ def update_stock_data():
             # FinanceDataReader 컬럼
             # Date, Open, High, Low, Close, Volume, Change, Updown, Comp, Amount, MarCap, Shares
             if not df.empty:
-                """
+
                 # Avro 포맷 저장
                 # Convert DataFrame to list of dictionaries
                 records = df.to_dict('records')
@@ -99,9 +99,9 @@ def update_stock_data():
                     bucket_name=bucket_name,
                     replace=True
                 )
+
+                
                 """
-                
-                
                 # ORC 포맷 저장 
                 # Pandas DataFrame을 PyArrow Table로 변환
                 table = pa.Table.from_pandas(df)
@@ -118,7 +118,7 @@ def update_stock_data():
                     bucket_name=bucket_name,
                     replace=True
                 )
-
+                """
                 
                 """
                 # Parquet 포맷 저장
@@ -136,9 +136,10 @@ def update_stock_data():
                     replace=True
                 )
                 """
-                logging.info(f"Successfully saved ORC data for {company_name} {company_code}")
+                logging.info(f"Successfully saved Avro data for {company_name} {company_code}")
+                #logging.info(f"Successfully saved ORC data for {company_name} {company_code}")
                 #logging.info(f"Successfully saved Parquet data for {company_name} {company_code}")
-                #logging.info(f"Successfully saved Avro data for {company_name} {company_code}")
+
 
             else:
                 logging.info(f"Fail to get stock data for {company_name} {company_code}")
