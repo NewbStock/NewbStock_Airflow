@@ -66,6 +66,43 @@ def update_stock_data():
             # FinanceDataReader 컬럼
             # Date, Open, High, Low, Close, Volume, Change, Updown, Comp, Amount, MarCap, Shares
             if not df.empty:
+                # ORC 포맷 저장 
+                # Pandas DataFrame을 PyArrow Table로 변환
+                table = pa.Table.from_pandas(df)
+
+                # ORC로 변환하여 S3에 저장
+                orc_buffer = BytesIO()
+                orc_writer = orc.ORCWriter(orc_buffer)
+                orc_writer.write(table)
+                orc_writer.close()
+
+                s3_hook.load_bytes(
+                    bytes_data=orc_buffer.getvalue(),
+                    key=key,
+                    bucket_name=bucket_name,
+                    replace=True
+                )
+
+                """
+                # Avro 포맷 저장
+                # Convert DataFrame to list of dictionaries
+                records = df.to_dict('records')
+
+                # Write to Avro format
+                avro_buffer = BytesIO()
+                writer(avro_buffer, parse_schema(avro_schema), records)
+
+                # Upload to S3
+                s3_hook.load_bytes(
+                    bytes_data=avro_buffer.getvalue(),
+                    key=key,
+                    bucket_name=bucket_name,
+                    replace=True
+                )
+                """
+
+                """
+                # Parquet 포맷 저장
                 # Convert DataFrame to PyArrow Table
                 table = pa.Table.from_pandas(df)
 
@@ -79,8 +116,8 @@ def update_stock_data():
                     bucket_name=bucket_name,
                     replace=True
                 )
+                """
                 logging.info(f"Successfully saved Parquet data for {company_name} {company_code}")
-
 
             else:
                 logging.info(f"Fail to get stock data for {company_name} {company_code}")
