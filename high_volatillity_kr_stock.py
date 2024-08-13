@@ -36,8 +36,10 @@ def high_volatility_kr_stock():
         s3_key = 'kr_stock_data/kr_top100.csv'
         csv_content = s3_hook.read_key(s3_key, s3_bucket)
 
-        df = pd.read_csv(StringIO(csv_content))
-        top_100_codes = df['CompanyCode'].head(3).tolist()  # 상위 3개 회사 코드 추출
+        # 인코딩을 지정하여 CSV 읽기
+        df = pd.read_csv(StringIO(csv_content), encoding='utf-8')
+        logging.info(f"DataFrame columns: {df.columns.tolist()}")  # 열 이름 출력
+        top_100_codes = df['CompanyCode'].head(3).tolist()
         return top_100_codes
     
     @task(task_id="fetch_csv_files")
@@ -73,6 +75,7 @@ def high_volatility_kr_stock():
         for file_path in local_files:
             df = pd.read_csv(file_path)
             if not df.empty:
+                logging.info(f"DataFrame columns in {file_path}: {df.columns.tolist()}")
                 # 'Code' 대신 'CompanyCode' 사용
                 code = df['CompanyCode'].iloc[0]  # 회사 코드 추출
                 
@@ -83,7 +86,7 @@ def high_volatility_kr_stock():
 
                 # 변동률이 10% 이상인 날짜 찾기
                 high_volatility = df[df['Change'].abs() > 10]
-                if not high_volatility.empty():
+                if not high_volatility.empty:
                     high_volatility_file = f"/tmp/{code}_high_volatility.csv"
                     high_volatility.to_csv(high_volatility_file, index=False)
                     
