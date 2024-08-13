@@ -73,7 +73,7 @@ def high_volatility_us_stock():
     @task(task_id="invoke_lambda_for_volatility")
     def invoke_lambda_for_volatility(local_files):
         lambda_client = boto3.client('lambda', region_name='ap-northeast-2')
-        lambda_function_name = 'process_high_volatility'
+        lambda_function_name = 'newbstock_high_volatility_us_stock'
         
         # Airflow Connections에서 Redshift 연결 정보 가져오기
         redshift_conn = BaseHook.get_connection('redshift_conn')
