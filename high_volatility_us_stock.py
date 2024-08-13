@@ -75,7 +75,7 @@ def high_volatility_us_stock():
         """
         변동성 높은 주식 데이터를 처리하기 위해 AWS Lambda 함수를 호출합니다.
         """
-        lambda_client = boto3.client('lambda')
+        lambda_client = boto3.client('lambda', region_name='ap-northeast-2')
         lambda_function_name = 'newbstock_high_volatility_us_stock'
         
         # Airflow Connections에서 Redshift 연결 정보 가져오기
