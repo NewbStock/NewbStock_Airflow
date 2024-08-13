@@ -50,8 +50,8 @@ def update_stock_data():
 
     # 현재 top 100 기업의 데이터 업데이트 또는 새로 생성
     for _, company in kr_top100.iterrows():
-        company_name = company['name']
-        company_code = str(company['code']).zfill(6)
+        company_name = company['CompanyName']
+        company_code = str(company['CompanyCode']).zfill(6)
         key = f'kr_stock_data/parquet/{company_code}.csv'
         #company_code = str(company['code']).zfill(6)  # 'code' 컬럼의 값을 6자리로 맞추기 (앞에 0 추가)
 
