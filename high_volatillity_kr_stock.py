@@ -50,13 +50,15 @@ def high_volatility_kr_stock():
         local_files = []
 
         for code in top_100_codes:
-            file_key = f'kr_stock_data/stock_data/{code}.csv'
+            # 코드 번호를 6자리로 포맷팅
+            formatted_code = f'{int(code):06d}'
+            file_key = f'kr_stock_data/stock_data/{formatted_code}.csv'
             try:
                 csv_content = s3_hook.read_key(file_key, s3_bucket)
                 df = pd.read_csv(StringIO(csv_content))
                 
                 # 임시 파일에 CSV 내용을 저장
-                temp_csv = f"/tmp/{code}.csv"
+                temp_csv = f"/tmp/{formatted_code}.csv"
                 df.to_csv(temp_csv, index=False)
                 
                 local_files.append(temp_csv)
