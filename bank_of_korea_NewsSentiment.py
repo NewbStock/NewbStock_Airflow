@@ -69,12 +69,12 @@ def news_sentiment_etl():
             df = pd.read_csv(BytesIO(csv_content), encoding='utf-8-sig')
 
             # 필요한 데이터 전처리 수행
-            df['TIME'] = pd.to_datetime(df['TIME'], format='%Y%m%d')
-            df.set_index('TIME', inplace=True)
-            df_resampled = df.resample('M').mean().reset_index()
+            df = df.rename(columns={"TIME": "Date", "DATA_VALUE": "NewsSentimentIndex"})
+            df['Date'] = pd.to_datetime(df['Date'], format='%Y%m%d')
+            df = df[['Date', 'NewsSentimentIndex']]
 
             processed_file_path = '/tmp/ProcessedNewsSentimentData.csv'
-            df_resampled.to_csv(processed_file_path, index=False, encoding='utf-8-sig')
+            df.to_csv(processed_file_path, index=False, encoding='utf-8-sig')
 
             return processed_file_path
         except Exception as e:

@@ -1,5 +1,3 @@
-import csv
-import requests
 from datetime import datetime, timedelta
 from airflow.decorators import task, dag
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
@@ -36,7 +34,6 @@ def high_volatility_kr_stock():
         s3_key = 'kr_stock_data/kr_top100.csv'
         csv_content = s3_hook.read_key(s3_key, s3_bucket)
 
-        # 인코딩을 지정하여 CSV 읽기
         df = pd.read_csv(StringIO(csv_content), encoding='utf-8')
         logging.info(f"DataFrame columns: {df.columns.tolist()}")  # 열 이름 출력
         top_100_codes = df['CompanyCode'].head(3).tolist()
@@ -78,7 +75,7 @@ def high_volatility_kr_stock():
             df = pd.read_csv(file_path)
             if not df.empty:
                 logging.info(f"DataFrame columns in {file_path}: {df.columns.tolist()}")
-                code = df['code'].iloc[0]  # 'CompanyCode' 대신 'code' 사용
+                code = df['code'].iloc[0]  
                 
                 # 변동률 계산
                 df['Close'] = df['Close'].astype(float)
