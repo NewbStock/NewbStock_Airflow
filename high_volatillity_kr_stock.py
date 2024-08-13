@@ -73,6 +73,7 @@ def high_volatility_kr_stock():
         for file_path in local_files:
             df = pd.read_csv(file_path)
             if not df.empty:
+                # 'Code' 대신 'CompanyCode' 사용
                 code = df['CompanyCode'].iloc[0]  # 회사 코드 추출
                 
                 # 변동률 계산
@@ -82,7 +83,7 @@ def high_volatility_kr_stock():
 
                 # 변동률이 10% 이상인 날짜 찾기
                 high_volatility = df[df['Change'].abs() > 10]
-                if not high_volatility.empty:
+                if not high_volatility.empty():
                     high_volatility_file = f"/tmp/{code}_high_volatility.csv"
                     high_volatility.to_csv(high_volatility_file, index=False)
                     
