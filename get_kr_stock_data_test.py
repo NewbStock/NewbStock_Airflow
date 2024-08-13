@@ -13,7 +13,7 @@ from io import StringIO, BytesIO
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pyarrow.orc as orc
-from fastavro import writer, parse_schema
+#from fastavro import writer, parse_schema
 
 
 # S3에서 'kr_top100.csv' (오늘 시가총액 top100) 데이터 가져오기
