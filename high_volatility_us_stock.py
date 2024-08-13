@@ -72,7 +72,7 @@ def high_volatility_us_stock():
     
     @task(task_id="invoke_lambda_for_volatility")
     def invoke_lambda_for_volatility(local_files):
-        lambda_client = boto3.client('lambda', region_name='ap-northeast-2')  # 서울 리전 예시
+        lambda_client = boto3.client('lambda', region_name='ap-northeast-2')
         lambda_function_name = 'process_high_volatility'
         
         # Airflow Connections에서 Redshift 연결 정보 가져오기
@@ -83,18 +83,22 @@ def high_volatility_us_stock():
             'dbname': redshift_conn.schema,
             'user': redshift_conn.login,
             'password': redshift_conn.password,
-            'table': 'high_volatility_days'  # 필요한 경우 변수화 가능
+            'table': 'high_volatility_days'
         }
 
+        s3_hook = S3Hook(aws_conn_id='s3_conn')
+        s3_bucket = 'team-won-2-bucket'
+
         for file_path in local_files:
-            with open(file_path, 'r') as f:
-                csv_content = f.read()
-                
+            # S3에 파일 업로드
+            s3_key = f"temp/{file_path.split('/')[-1]}"
+            s3_hook.load_file(filename=file_path, key=s3_key, bucket_name=s3_bucket, replace=True)
+
+            # Lambda에 전달할 페이로드에 S3 경로 포함
             payload = {
-                'file_content': csv_content,
-                'file_name': file_path.split('/')[-1],
-                'bucket_name': 'team-won-2-bucket',
-                'redshift_config': redshift_config  # Redshift 연결 정보를 Lambda에 전달
+                's3_bucket': s3_bucket,
+                's3_key': s3_key,
+                'redshift_config': redshift_config
             }
 
             response = lambda_client.invoke(
@@ -104,6 +108,7 @@ def high_volatility_us_stock():
             )
             
             logging.info(f"Invoked Lambda function {lambda_function_name} with response: {response}")
+
 
     # DAG의 태스크들 연결
     top_100_codes = read_csv_from_s3()
