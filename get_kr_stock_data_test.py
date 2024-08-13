@@ -13,7 +13,7 @@ from datetime import datetime
 import logging
 from io import StringIO, BytesIO
 import pyarrow as pa
-import pyarrow.parqueet as pq
+import pyarrow.parquet as pq
 
 
 # S3에서 'kr_top100.csv' (오늘 시가총액 top100) 데이터 가져오기
