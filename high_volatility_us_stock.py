@@ -72,21 +72,18 @@ def high_volatility_us_stock():
     
     @task(task_id="invoke_lambda_for_volatility")
     def invoke_lambda_for_volatility(local_files):
-        """
-        변동성 높은 주식 데이터를 처리하기 위해 AWS Lambda 함수를 호출합니다.
-        """
-        lambda_client = boto3.client('lambda', region_name='ap-northeast-2')
-        lambda_function_name = 'newbstock_high_volatility_us_stock'
+        lambda_client = boto3.client('lambda', region_name='ap-northeast-2')  # 서울 리전 예시
+        lambda_function_name = 'process_high_volatility'
         
         # Airflow Connections에서 Redshift 연결 정보 가져오기
         redshift_conn = BaseHook.get_connection('redshift_conn')
         redshift_config = {
-            'host': redshift_conn.host,           # team-won-2-redshift-cluster.cvkht4jvd430.ap-northeast-2.redshift.amazonaws.com
-            'port': redshift_conn.port,           # 5439
-            'dbname': redshift_conn.schema,       # dev
-            'user': redshift_conn.login,          # newbstock_admin
-            'password': redshift_conn.password,   # (Airflow에 저장된 비밀번호)
-            'table': 'high_volatility_days'       # 사용하고자 하는 테이블 이름
+            'host': redshift_conn.host,
+            'port': redshift_conn.port,
+            'dbname': redshift_conn.schema,
+            'user': redshift_conn.login,
+            'password': redshift_conn.password,
+            'table': 'high_volatility_days'  # 필요한 경우 변수화 가능
         }
 
         for file_path in local_files:
@@ -106,7 +103,7 @@ def high_volatility_us_stock():
                 Payload=json.dumps(payload)
             )
             
-            logging.info(f"Lambda 함수 {lambda_function_name}을 호출했습니다. 응답: {response}")
+            logging.info(f"Invoked Lambda function {lambda_function_name} with response: {response}")
 
     # DAG의 태스크들 연결
     top_100_codes = read_csv_from_s3()
