@@ -76,8 +76,7 @@ def high_volatility_kr_stock():
             df = pd.read_csv(file_path)
             if not df.empty:
                 logging.info(f"DataFrame columns in {file_path}: {df.columns.tolist()}")
-                # 'Code' 대신 'CompanyCode' 사용
-                code = df['CompanyCode'].iloc[0]  # 회사 코드 추출
+                code = df['code'].iloc[0]  # 'CompanyCode' 대신 'code' 사용
                 
                 # 변동률 계산
                 df['Close'] = df['Close'].astype(float)
