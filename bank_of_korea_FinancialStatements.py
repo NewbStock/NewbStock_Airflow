@@ -8,12 +8,12 @@ import os
 
 # 기본 DAG 인자 설정
 default_args = {
-    'owner': 'seungjun',  # DAG 소유자
-    'depends_on_past': False,  # 이전 DAG 실행의 성공 여부에 의존하지 않음
-    'email_on_failure': False,  # 실패 시 이메일 알림 비활성화
-    'email_on_retry': False,  # 재시도 시 이메일 알림 비활성화
-    'retries': 1,  # 실패 시 재시도 횟수
-    'retry_delay': timedelta(minutes=5),  # 재시도 간격
+    'owner': 'seungjun',  
+    'depends_on_past': False,
+    'email_on_failure': False,  
+    'email_on_retry': False, 
+    'retries': 1,  
+    'retry_delay': timedelta(minutes=5), 
 }
 
 @dag(

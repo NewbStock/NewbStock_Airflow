@@ -74,7 +74,7 @@ def high_volatility_us_stock():
         for file_path in local_files:
             df = pd.read_csv(file_path)
             if not df.empty:
-                code = df['code'].iloc[0]  # 주식 코드 추출
+                Code = df['Code'].iloc[0]  # 주식 코드 추출
                 
                 # 변동률 계산
                 df['Close'] = df['Close'].astype(float)
@@ -84,11 +84,11 @@ def high_volatility_us_stock():
                 # 변동률이 10% 이상인 날짜 찾기
                 high_volatility = df[df['Change'].abs() > 10]
                 if not high_volatility.empty:
-                    high_volatility_file = f"/tmp/{code}_high_volatility.csv"
+                    high_volatility_file = f"/tmp/{Code}_high_volatility.csv"
                     high_volatility.to_csv(high_volatility_file, index=False)
                     
                     # S3에 업로드
-                    s3_key = f'newb_data/stock_data/us/{code}_high_volatility.csv'
+                    s3_key = f'newb_data/stock_data/us/{Code}_high_volatility.csv'
                     s3_hook.load_file(
                         filename=high_volatility_file,
                         key=s3_key,
@@ -97,7 +97,7 @@ def high_volatility_us_stock():
                     )
                     logging.info(f"Successfully uploaded {s3_key} to S3")
                 else:
-                    logging.info(f"No high volatility days found for {code}")
+                    logging.info(f"No high volatility days found for {Code}")
             else:
                 logging.warning(f"The file {file_path} is empty and will be skipped")
 
