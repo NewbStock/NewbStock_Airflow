@@ -35,9 +35,6 @@ def high_volatility_us_stock():
     def read_csv_from_s3():
         """
         S3 버킷에서 상위 100개 미국 주식 코드를 포함한 CSV 파일을 읽어옵니다.
-
-        Returns:
-            list: 상위 3개의 미국 주식 코드 리스트.
         """
         s3_hook = S3Hook(aws_conn_id='s3_conn')
         s3_bucket = 'team-won-2-bucket'
@@ -52,12 +49,6 @@ def high_volatility_us_stock():
     def fetch_csv_files(top_100_codes):
         """
         S3에서 상위 3개의 미국 주식 코드에 대한 역사 데이터를 가져옵니다.
-
-        Args:
-            top_100_codes (list): 상위 3개의 미국 주식 코드 리스트.
-
-        Returns:
-            list: 다운로드된 CSV 파일 경로 리스트.
         """
         s3_hook = S3Hook(aws_conn_id='s3_conn')
         s3_bucket = 'team-won-2-bucket'
@@ -83,9 +74,6 @@ def high_volatility_us_stock():
     def invoke_lambda_for_volatility(local_files):
         """
         변동성 높은 주식 데이터를 처리하기 위해 AWS Lambda 함수를 호출합니다.
-
-        Args:
-            local_files (list): 로컬에 저장된 CSV 파일 경로 리스트.
         """
         lambda_client = boto3.client('lambda')
         lambda_function_name = 'newbstock_high_volatility_us_stock'
