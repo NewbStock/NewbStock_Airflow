@@ -1,7 +1,5 @@
 """
-S3에서 'kr_top100.csv' 데이터 가져오기
-만약 {CompanyCode}.csv 파일이 S3에 없다면, FinanceDataReader에서 2000년 데이터부터 다 가져오기
-파일이 이미 있다면, 당일 날짜의 데이터만 가져와서 원래 파일에 추가
+S3에서 'kr_top100.csv' 데이터 가져와서 Parquet, ORC, Avro 포맷으로 S3에 저장 
 """
 # pip install finance-datareader
 from airflow import DAG
@@ -15,6 +13,7 @@ from io import StringIO, BytesIO
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pyarrow.orc as orc
+from fastavro import writer, parse_schema
 
 
 # S3에서 'kr_top100.csv' (오늘 시가총액 top100) 데이터 가져오기
@@ -53,8 +52,9 @@ def update_stock_data():
     for _, company in kr_top100.iterrows():
         company_name = company['CompanyName']
         company_code = str(company['CompanyCode']).zfill(6)
-        #key = f'kr_stock_data/parquet/{company_code}.csv'
-        key = f'kr_stock_data/orc/{company_code}.csv'
+        key = f'kr_stock_data/parquet/{company_code}.parquet'
+        #key = f'kr_stock_data/orc/{company_code}.json'
+        #key = f'kr_stock_data/avro/{company_code}.json'
 
         try:
             df = fdr.DataReader(f'KRX:{company_code}', start = '2000-01-01')        
@@ -67,6 +67,7 @@ def update_stock_data():
             # FinanceDataReader 컬럼
             # Date, Open, High, Low, Close, Volume, Change, Updown, Comp, Amount, MarCap, Shares
             if not df.empty:
+                """
                 # ORC 포맷 저장 
                 # Pandas DataFrame을 PyArrow Table로 변환
                 table = pa.Table.from_pandas(df)
@@ -83,7 +84,8 @@ def update_stock_data():
                     bucket_name=bucket_name,
                     replace=True
                 )
-
+                """
+                
                 """
                 # Avro 포맷 저장
                 # Convert DataFrame to list of dictionaries
@@ -102,7 +104,7 @@ def update_stock_data():
                 )
                 """
 
-                """
+
                 # Parquet 포맷 저장
                 # Convert DataFrame to PyArrow Table
                 table = pa.Table.from_pandas(df)
@@ -117,8 +119,10 @@ def update_stock_data():
                     bucket_name=bucket_name,
                     replace=True
                 )
-                """
+
                 logging.info(f"Successfully saved Parquet data for {company_name} {company_code}")
+                #logging.info(f"Successfully saved ORC data for {company_name} {company_code}")
+                #logging.info(f"Successfully saved Avro data for {company_name} {company_code}")
 
             else:
                 logging.info(f"Fail to get stock data for {company_name} {company_code}")
