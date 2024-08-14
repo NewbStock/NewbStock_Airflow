@@ -8,6 +8,7 @@ import pandas as pd
 import logging
 from io import StringIO
 import os
+import psycopg2
 
 # 기본 DAG 설정
 default_args = {
@@ -70,25 +71,19 @@ def high_volatility_us_stock():
                 logging.error(f"S3에서 {file_key} 파일을 읽는 중 오류 발생: {e}")
 
         return local_files
-    
+
     @task(task_id="invoke_lambda_for_volatility")
     def invoke_lambda_for_volatility(local_files):
+        """
+        Lambda 함수를 호출하여 변동성 높은 데이터를 필터링하고 S3에 저장합니다.
+        """
         lambda_client = boto3.client('lambda', region_name='ap-northeast-2')
         lambda_function_name = 'newbstock_high_volatility_us_stock'
         
-        # Airflow Connections에서 Redshift 연결 정보 가져오기
-        redshift_conn = BaseHook.get_connection('redshift_conn')
-        redshift_config = {
-            'host': redshift_conn.host,
-            'port': redshift_conn.port,
-            'dbname': redshift_conn.schema,
-            'user': redshift_conn.login,
-            'password': redshift_conn.password,
-            'table': 'public.high_volatility_days_us_stock'
-        }
-
         s3_hook = S3Hook(aws_conn_id='s3_conn')
         s3_bucket = 'team-won-2-bucket'
+
+        processed_files = []
 
         for file_path in local_files:
             # S3에 파일 업로드
@@ -99,16 +94,25 @@ def high_volatility_us_stock():
             payload = {
                 's3_bucket': s3_bucket,
                 's3_key': s3_key,
-                'redshift_config': redshift_config
+                'processed_bucket': s3_bucket
             }
 
             try:
                 response = lambda_client.invoke(
                     FunctionName=lambda_function_name,
-                    InvocationType='Event',  # 또는 'RequestResponse'로 변경하여 동기 호출 가능
+                    InvocationType='RequestResponse',  # 동기 호출
                     Payload=json.dumps(payload)
                 )
-                logging.info(f"Invoked Lambda function {lambda_function_name} with response: {response}")
+
+                # Lambda 응답 처리
+                response_payload = json.loads(response['Payload'].read().decode('utf-8'))
+                processed_key = response_payload.get('processed_key', None)
+
+                if processed_key:
+                    processed_files.append(processed_key)
+                    logging.info(f"Lambda 함수가 처리한 파일을 S3에 저장했습니다: {processed_key}")
+                else:
+                    logging.error(f"Lambda 함수 호출에 실패했습니다: {response_payload}")
             except Exception as e:
                 logging.error(f"Lambda 호출 중 오류 발생: {e}")
 
@@ -119,11 +123,60 @@ def high_volatility_us_stock():
             except Exception as e:
                 logging.error(f"로컬 파일 {file_path} 삭제 중 오류 발생: {e}")
 
+        return processed_files
+
+    @task(task_id="load_to_redshift")
+    def load_to_redshift(processed_files):
+        """
+        처리된 데이터를 S3에서 가져와 Redshift에 로드합니다.
+        """
+        s3_hook = S3Hook(aws_conn_id='s3_conn')
+        s3_bucket = 'team-won-2-bucket'
+
+        # Airflow Connections에서 Redshift 연결 정보 가져오기
+        redshift_conn = BaseHook.get_connection('redshift_conn')
+        redshift_config = {
+            'host': redshift_conn.host,
+            'port': redshift_conn.port,
+            'dbname': redshift_conn.schema,
+            'user': redshift_conn.login,
+            'password': redshift_conn.password,
+            'table': 'public.high_volatility_us',
+        }
+
+        for s3_key in processed_files:
+            try:
+                # Redshift에 데이터 로드
+                copy_sql = f"""
+                COPY {redshift_config['table']}
+                FROM 's3://{s3_bucket}/{s3_key}'
+                IAM_ROLE '{redshift_config['iam_role']}'
+                CSV
+                IGNOREHEADER 1
+                DATEFORMAT 'auto';
+                """
+                conn = psycopg2.connect(
+                    dbname=redshift_config['dbname'],
+                    user=redshift_config['user'],
+                    password=redshift_config['password'],
+                    host=redshift_config['host'],
+                    port=redshift_config['port']
+                )
+                cur = conn.cursor()
+                cur.execute(copy_sql)
+                conn.commit()
+                cur.close()
+                conn.close()
+                
+                logging.info(f"Data successfully loaded into Redshift table {redshift_config['table']} from {s3_key}")
+            except Exception as e:
+                logging.error(f"Error loading data to Redshift from {s3_key}: {e}")
 
     # DAG의 태스크들 연결
     top_100_codes = read_csv_from_s3()
     local_files = fetch_csv_files(top_100_codes)
-    invoke_lambda_for_volatility(local_files)
+    processed_files = invoke_lambda_for_volatility(local_files)
+    load_to_redshift(processed_files)
 
 # DAG 인스턴스 생성
 dag = high_volatility_us_stock()
