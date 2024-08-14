@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from io import BytesIO
 from airflow.decorators import task, dag
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+from airflow.providers.postgres.hooks.postgres import PostgresHook
 import pandas as pd
 
 # 기본 DAG 인자 설정
@@ -110,8 +111,24 @@ def interest_rate_etl():
         # 데이터프레임 합치기
         combined_df = pd.concat(dfs)
 
-        # 필요한 데이터 전처리 수행
-        df_pivot = combined_df.pivot_table(
+        # 필요한 데이터만 필터링
+        selected_items = [
+            "KOFR(공시 RFR)",
+            "KORIBOR(12개월)",
+            "국고채(10년)",
+            "국고채(2년)",
+            "국고채(5년)",
+            "콜금리(1일, 은행증권금융차입)",
+            "콜금리(1일, 전체거래)",
+            "콜금리(1일, 중개회사거래)",
+            "회사채(3년, AA-)",
+            "회사채(3년, BBB-)"
+        ]
+        
+        df_filtered = combined_df[combined_df['ITEM_NAME1'].isin(selected_items)]
+
+        # 피벗 테이블 생성
+        df_pivot = df_filtered.pivot_table(
             index='TIME', 
             columns='ITEM_NAME1', 
             values='DATA_VALUE', 
@@ -130,14 +147,43 @@ def interest_rate_etl():
         s3_bucket = 'team-won-2-bucket'
         s3_key = 'newb_data/bank_of_korea/processed/ProcessedMarketInterestRateData.csv'
         s3_hook.load_file(file_path, s3_key, bucket_name=s3_bucket, replace=True)
-        return f"s3://{s3_bucket}/{s3_key}"
+        processed_s3_path = f"s3://{s3_bucket}/{s3_key}"\
+        
+        return processed_s3_path
+    
+    @task(task_id="load_to_redshift")
+    def load_to_redshift(processed_s3_path: str):
+        """S3에서 처리된 파일을 Redshift로 로드"""
+        redshift_conn_id = 'redshift_conn'
+        aws_conn_id = 'aws_default'
+        redshift_table = 'public.market_interest_rates'
+        
+        redshift_hook = PostgresHook(postgres_conn_id=redshift_conn_id)
+        s3_hook = S3Hook(aws_conn_id=aws_conn_id)
+        
+        copy_sql = f"""
+            COPY {redshift_table}
+            FROM '{processed_s3_path}'
+            ACCESS_KEY_ID '{s3_hook.get_credentials().access_key}'
+            SECRET_ACCESS_KEY '{s3_hook.get_credentials().secret_key}'
+            CSV
+            IGNOREHEADER 1
+            DELIMITER ','
+            REGION 'ap-northeast-2';
+        """
+        try:
+            redshift_hook.run(copy_sql)
+            logging.info(f"{processed_s3_path} 데이터를 Redshift로 성공적으로 로드했습니다.")
+        except Exception as e:
+            logging.error(f"Redshift로 데이터를 로드하는 중 오류 발생: {e}")
 
     # DAG 실행 순서 정의
     file_path1 = fetch_data_part1()
     file_path2 = fetch_data_part2()
     raw_s3_paths = upload_raw_to_s3(file_path1, file_path2)
     processed_file_path = process_data(raw_s3_paths)
-    upload_processed_to_s3(processed_file_path)
+    processed_s3_path = upload_processed_to_s3(processed_file_path)
+    load_to_redshift(processed_s3_path)
 
 # DAG 인스턴스 생성
 dag = interest_rate_etl()
