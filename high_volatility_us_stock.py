@@ -108,7 +108,7 @@ def high_volatility_us_stock():
                 response_payload = json.loads(response['Payload'].read().decode('utf-8'))
                 processed_key = response_payload.get('processed_key', None)
 
-                if processed_key:
+                if response['StatusCode'] == 200 and processed_key:
                     processed_files.append(processed_key)
                     logging.info(f"Lambda 함수가 처리한 파일을 S3에 저장했습니다: {processed_key}")
                 else:
@@ -117,13 +117,10 @@ def high_volatility_us_stock():
                 logging.error(f"Lambda 호출 중 오류 발생: {e}")
 
             # 로컬 파일 삭제
-            try:
-                os.remove(file_path)
-                logging.info(f"로컬 파일 {file_path} 삭제 완료")
-            except Exception as e:
-                logging.error(f"로컬 파일 {file_path} 삭제 중 오류 발생: {e}")
+            os.remove(file_path)
 
         return processed_files
+
 
     @task(task_id="load_to_redshift")
     def load_to_redshift(processed_files):
