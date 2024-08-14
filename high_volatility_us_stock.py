@@ -11,12 +11,6 @@ from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 import boto3
 
-# 주말 여부를 확인하는 함수
-def is_weekend():
-    today = datetime.today().weekday()
-    # 5 = Saturday, 6 = Sunday
-    return today in [5, 6]
-
 # 기본 DAG 설정
 default_args = {
     'owner': 'seungjun',
@@ -31,20 +25,14 @@ default_args = {
     dag_id='high_volatility_us_stock',
     default_args=default_args,
     description='초보 투자자를 위한 변동성 높은 미국 주식 데이터 수집 및 처리',
-    schedule_interval='@daily',
+    schedule_interval=timedelta(days=1),
     start_date=datetime(2023, 1, 1),
-    catchup=False,
-    max_active_runs=1,
-    tags=['stocks'],
+    catchup=False
 )
 def high_volatility_us_stock():
     """
     초보 투자자를 위한 변동성 높은 미국 주식 데이터를 수집 및 처리하는 DAG입니다.
     """
-
-    if is_weekend():
-        logging.info("주말이므로 DAG 실행을 건너뜁니다.")
-        return
 
     @task(task_id="read_csv_from_s3")
     def read_csv_from_s3():
@@ -116,6 +104,7 @@ def high_volatility_us_stock():
                     InvocationType='RequestResponse',  # 동기 호출
                     Payload=json.dumps(payload)
                 )
+
             except Exception as e:
                 logging.error(f"Lambda 호출 중 오류 발생: {e}")
 
@@ -124,11 +113,11 @@ def high_volatility_us_stock():
 
         return processed_files
 
+
     @task(task_id="load_to_redshift")
     def load_to_redshift(processed_files):
         """
         S3에서 Lambda를 통해 처리된 파일들을 Redshift로 로드합니다.
-        주말에는 데이터를 로드하지 않습니다.
         """
         redshift_conn_id = 'redshift_conn'
         aws_conn_id = 's3_conn'
@@ -138,13 +127,7 @@ def high_volatility_us_stock():
         redshift_hook = PostgresHook(postgres_conn_id=redshift_conn_id)
         s3_hook = S3Hook(aws_conn_id=aws_conn_id)
         
-        today = datetime.today().strftime('%Y-%m-%d')
-
         for s3_key in processed_files:
-            if today not in s3_key:
-                logging.info(f"{s3_key}은 오늘({today})의 데이터가 아니므로 건너뜁니다.")
-                continue
-
             # Redshift COPY 명령어 실행
             copy_sql = f"""
                 COPY {redshift_table}
@@ -161,6 +144,7 @@ def high_volatility_us_stock():
                 logging.info(f"{s3_key} 데이터를 Redshift로 성공적으로 로드했습니다.")
             except Exception as e:
                 logging.error(f"Redshift로 데이터를 로드하는 중 오류 발생: {e}")
+
 
     # DAG의 태스크들 연결
     top_100_codes = read_csv_from_s3()
