@@ -151,6 +151,22 @@ def interest_rate_etl():
         
         return processed_s3_path
     
+    @task(task_id="truncate_table")
+    def truncate_table():
+        """
+        Redshift 테이블에서 데이터를 삭제합니다.
+        """
+        redshift_conn_id = 'redshift_conn'
+        redshift_hook = PostgresHook(postgres_conn_id=redshift_conn_id)
+        
+        truncate_sql = "TRUNCATE TABLE public.market_interest_rates;"
+        
+        try:
+            redshift_hook.run(truncate_sql)
+            logging.info("테이블을 성공적으로 비웠습니다.")
+        except Exception as e:
+            logging.error(f"테이블을 비우는 중 오류 발생: {e}")
+    
     @task(task_id="load_to_redshift")
     def load_to_redshift(processed_s3_path: str):
         """S3에서 처리된 파일을 Redshift로 로드"""
@@ -183,7 +199,7 @@ def interest_rate_etl():
     raw_s3_paths = upload_raw_to_s3(file_path1, file_path2)
     processed_file_path = process_data(raw_s3_paths)
     processed_s3_path = upload_processed_to_s3(processed_file_path)
-    load_to_redshift(processed_s3_path)
+    truncate_table() >> load_to_redshift(processed_s3_path)
 
 # DAG 인스턴스 생성
 dag = interest_rate_etl()
