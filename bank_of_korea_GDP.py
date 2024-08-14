@@ -66,6 +66,17 @@ def gdp_etl():
 
         return file_paths
 
+    @task(task_id="upload_raw_to_s3")
+    def upload_raw_to_s3(file_paths: list):
+        """로컬에 저장된 원본 CSV 파일들을 S3에 업로드"""
+        s3_hook = S3Hook(aws_conn_id='s3_conn')
+        s3_bucket = 'team-won-2-bucket'
+
+        for file_path in file_paths:
+            country_name = os.path.basename(file_path).split('.')[0]
+            s3_key = f'newb_data/bank_of_korea/raw/gdp/{country_name}_GDP.csv'
+            s3_hook.load_file(file_path, s3_key, bucket_name=s3_bucket, replace=True)
+
     @task(task_id="process_data")
     def process_data(file_paths: list):
         """수집된 GDP 데이터를 가공하여 처리된 CSV 파일로 저장"""
@@ -88,22 +99,22 @@ def gdp_etl():
 
         return processed_file_paths
 
-    @task(task_id="upload_to_s3")
-    def upload_to_s3(file_paths: list):
-        """로컬에 저장된 CSV 파일들을 S3에 업로드"""
+    @task(task_id="upload_processed_to_s3")
+    def upload_processed_to_s3(file_paths: list):
+        """로컬에 저장된 처리된 CSV 파일들을 S3에 업로드"""
         s3_hook = S3Hook(aws_conn_id='s3_conn')
         s3_bucket = 'team-won-2-bucket'
 
         for file_path in file_paths:
-            country_name = os.path.basename(file_path).split('.')[0]
+            country_name = os.path.basename(file_path).split('.')[0].replace('Processed_', '')
             s3_key = f'newb_data/bank_of_korea/processed/gdp/{country_name}_GDP.csv'
             s3_hook.load_file(file_path, s3_key, bucket_name=s3_bucket, replace=True)
 
     # DAG 실행 순서 정의
     raw_file_paths = fetch_data()
+    upload_raw_to_s3(raw_file_paths)
     processed_file_paths = process_data(raw_file_paths)
-    upload_to_s3(raw_file_paths)
-    upload_to_s3(processed_file_paths)
+    upload_processed_to_s3(processed_file_paths)
 
 # DAG 인스턴스 생성
 dag = gdp_etl()

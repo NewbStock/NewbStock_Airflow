@@ -80,9 +80,17 @@ def financial_statements_etl():
 
         return processed_file_path
 
-    @task(task_id="upload_to_s3")
-    def upload_to_s3(file_path: str):
-        """로컬에 저장된 재무제표 CSV 파일을 S3에 업로드"""
+    @task(task_id="upload_raw_to_s3")
+    def upload_raw_to_s3(file_path: str):
+        """로컬에 저장된 원본 재무제표 CSV 파일을 S3에 업로드"""
+        s3_hook = S3Hook(aws_conn_id='s3_conn')
+        s3_bucket = 'team-won-2-bucket'
+        s3_key = f'newb_data/bank_of_korea/raw/FinancialStatements.csv'
+        s3_hook.load_file(file_path, s3_key, bucket_name=s3_bucket, replace=True)
+
+    @task(task_id="upload_processed_to_s3")
+    def upload_processed_to_s3(file_path: str):
+        """로컬에 저장된 처리된 재무제표 CSV 파일을 S3에 업로드"""
         s3_hook = S3Hook(aws_conn_id='s3_conn')
         s3_bucket = 'team-won-2-bucket'
         s3_key = f'newb_data/bank_of_korea/processed/FinancialStatements.csv'
@@ -90,9 +98,9 @@ def financial_statements_etl():
 
     # DAG 실행 순서 정의
     raw_file_path = fetch_data()
+    upload_raw_to_s3(raw_file_path)
     processed_file_path = process_data(raw_file_path)
-    upload_to_s3(raw_file_path)
-    upload_to_s3(processed_file_path)
+    upload_processed_to_s3(processed_file_path)
 
 # DAG 인스턴스 생성
 dag = financial_statements_etl()
