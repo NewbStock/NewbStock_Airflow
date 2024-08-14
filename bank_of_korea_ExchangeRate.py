@@ -98,29 +98,29 @@ def exchange_rate_etl():
             raise
 
     @task(task_id="upload_processed_to_s3")
-    def upload_processed_to_s3(file_path: str):
+    def upload_processed_to_s3(file_path: str) -> str:
         """처리된 데이터를 S3 버킷에 업로드"""
         s3_hook = S3Hook(aws_conn_id='s3_conn')
         s3_bucket = 'team-won-2-bucket'
         s3_key = 'newb_data/bank_of_korea/processed/ProcessedExchangeRateData.csv'
         s3_hook.load_file(file_path, s3_key, bucket_name=s3_bucket, replace=True)
-        return f"s3://{s3_bucket}/{s3_key}"
+        processed_s3_path = f"s3://{s3_bucket}/{s3_key}"
+
+        return processed_s3_path
 
     @task(task_id="load_to_redshift")
     def load_to_redshift(processed_s3_path: str):
-        """처리된 데이터를 Redshift로 로드"""
+        """S3에서 처리된 파일을 Redshift로 로드"""
         redshift_conn_id = 'redshift_conn'
-        redshift_table = 'public.exchange_rate'
         aws_conn_id = 'aws_default'
-
-        s3_hook = S3Hook(aws_conn_id=aws_conn_id)
-
-        s3_bucket, s3_key = processed_s3_path.replace('s3://', '').split('/', 1)
+        redshift_table = 'public.exchange_rate'
+        
         redshift_hook = PostgresHook(postgres_conn_id=redshift_conn_id)
-
+        s3_hook = S3Hook(aws_conn_id=aws_conn_id)
+        
         copy_sql = f"""
             COPY {redshift_table}
-            FROM 's3://{s3_bucket}/{s3_key}'
+            FROM '{processed_s3_path}'
             ACCESS_KEY_ID '{s3_hook.get_credentials().access_key}'
             SECRET_ACCESS_KEY '{s3_hook.get_credentials().secret_key}'
             CSV
@@ -128,8 +128,11 @@ def exchange_rate_etl():
             DELIMITER ','
             REGION 'ap-northeast-2';
         """
-
-        redshift_hook.run(copy_sql)
+        try:
+            redshift_hook.run(copy_sql)
+            logging.info(f"{processed_s3_path} 데이터를 Redshift로 성공적으로 로드했습니다.")
+        except Exception as e:
+            logging.error(f"Redshift로 데이터를 로드하는 중 오류 발생: {e}")
 
     # 태스크 호출 및 종속성 설정
     file_path = fetch_data()
