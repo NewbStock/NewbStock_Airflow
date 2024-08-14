@@ -75,17 +75,6 @@ def high_volatility_kr_stock():
         lambda_client = boto3.client('lambda', region_name='ap-northeast-2')
         lambda_function_name = 'newbstock_high_volatility_kr_stock'
 
-        # Redshift 연결 정보 가져오기
-        redshift_conn = BaseHook.get_connection('redshift_conn')
-        redshift_config = {
-            'host': redshift_conn.host,
-            'port': redshift_conn.port,
-            'dbname': redshift_conn.schema,
-            'user': redshift_conn.login,
-            'password': redshift_conn.password,
-            'table': 'public.high_volatility_kr'
-        }
-
         s3_hook = S3Hook(aws_conn_id='s3_conn')
         s3_bucket = 'team-won-2-bucket'
 
@@ -97,8 +86,7 @@ def high_volatility_kr_stock():
             # Lambda에 전달할 페이로드에 S3 경로 포함
             payload = {
                 's3_bucket': s3_bucket,
-                's3_key': s3_key,
-                'redshift_config': redshift_config
+                's3_key': s3_key
             }
 
             try:
