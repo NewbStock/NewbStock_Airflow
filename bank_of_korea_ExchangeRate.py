@@ -87,7 +87,7 @@ def exchange_rate_etl():
 
             # 필요한 열만 남기기
             df_selected = df_pivot[['TIME', '원/100엔(하나은행고시)', '원/달러(종가 15:30)', '원/위안(종가)']]
-            df_selected.columns = ['TIME', '원/100엔 종가', '원/달러 종가', '원/위안 종가']  # 열 이름 변경
+            df_selected.columns = ['TIME', '100엔', '달러', '위안']  # 열 이름 변경
 
             processed_file_path = '/tmp/ProcessedExchangeRateData.csv'
             df_selected.to_csv(processed_file_path, index=False, encoding='utf-8-sig')
