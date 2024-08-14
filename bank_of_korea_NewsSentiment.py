@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from io import BytesIO
 from airflow.decorators import task, dag
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
-from airflow.providers.amazon.aws.hooks.redshift_sql import RedshiftSQLHook
+from airflow.providers.postgres.hooks.postgres import PostgresHook
 import pandas as pd
 
 
@@ -77,9 +77,8 @@ def news_sentiment_etl():
             df = pd.read_csv(BytesIO(csv_content), encoding='utf-8-sig')
 
             # 필요한 데이터 전처리 수행
-            df = df.rename(columns={"TIME": "Date", "DATA_VALUE": "NewsSentimentIndex"})
-            df['Date'] = pd.to_datetime(df['Date'], format='%Y%m%d')
-            df = df[['Date', 'NewsSentimentIndex']]
+            df = df.rename(columns={"DATA_VALUE": "NewsSentiment"})
+            df = df[['TIME', 'NewsSentiment']]
 
             processed_file_path = '/tmp/ProcessedNewsSentimentData.csv'
             df.to_csv(processed_file_path, index=False, encoding='utf-8-sig')
@@ -96,13 +95,42 @@ def news_sentiment_etl():
         s3_bucket = 'team-won-2-bucket'
         s3_key = 'newb_data/bank_of_korea/processed/ProcessedNewsSentimentData.csv'
         s3_hook.load_file(file_path, s3_key, bucket_name=s3_bucket, replace=True)
-        return f"s3://{s3_bucket}/{s3_key}"
+        processed_s3_path = f"s3://{s3_bucket}/{s3_key}"
+
+        return processed_s3_path
+    
+    @task(task_id="load_to_redshift")
+    def load_to_redshift(processed_s3_path: str):
+        """S3에서 처리된 파일을 Redshift로 로드"""
+        redshift_conn_id = 'redshift_conn'
+        aws_conn_id = 'aws_default'
+        redshift_table = 'public.newssentiment'
+        
+        redshift_hook = PostgresHook(postgres_conn_id=redshift_conn_id)
+        s3_hook = S3Hook(aws_conn_id=aws_conn_id)
+        
+        copy_sql = f"""
+            COPY {redshift_table}
+            FROM '{processed_s3_path}'
+            ACCESS_KEY_ID '{s3_hook.get_credentials().access_key}'
+            SECRET_ACCESS_KEY '{s3_hook.get_credentials().secret_key}'
+            CSV
+            IGNOREHEADER 1
+            DELIMITER ','
+            REGION 'ap-northeast-2';
+        """
+        try:
+            redshift_hook.run(copy_sql)
+            logging.info(f"{processed_s3_path} 데이터를 Redshift로 성공적으로 로드했습니다.")
+        except Exception as e:
+            logging.error(f"Redshift로 데이터를 로드하는 중 오류 발생: {e}")
 
     # DAG 실행 순서 정의
     file_path = fetch_data()
     raw_s3_path = upload_raw_to_s3(file_path)
     processed_file_path = process_data(raw_s3_path)
-    upload_processed_to_s3(processed_file_path)
+    processed_s3_path = upload_processed_to_s3(processed_file_path)
+    load_to_redshift(processed_s3_path)
 
 # DAG 인스턴스 생성
 dag = news_sentiment_etl()
