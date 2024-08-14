@@ -55,6 +55,16 @@ def financial_statements_etl():
                 writer.writerow({field: row.get(field) for field in fieldnames})
 
         return file_path
+    
+
+    @task(task_id="upload_raw_to_s3")
+    def upload_raw_to_s3(file_path: str):
+        """로컬에 저장된 원본 재무제표 CSV 파일을 S3에 업로드"""
+        s3_hook = S3Hook(aws_conn_id='s3_conn')
+        s3_bucket = 'team-won-2-bucket'
+        s3_key = f'newb_data/bank_of_korea/raw_data/FinancialStatements.csv'
+        s3_hook.load_file(file_path, s3_key, bucket_name=s3_bucket, replace=True)
+        
 
     @task(task_id="process_data")
     def process_data(file_path: str):
@@ -63,7 +73,7 @@ def financial_statements_etl():
 
         # 열 이름을 재정의하고, 데이터 처리
         df = df.rename(columns={"TIME": "Date", "DATA_VALUE": "FinancialData"})
-        df['Date'] = pd.to_datetime(df['Date'], format='%Y%m%d')
+        df['Date'] = pd.to_datetime(df['Date'], format='%Y%m')
         df = df[['Date', 'ITEM_NAME1', 'FinancialData']]
 
         # 데이터가 긴 형식에서 넓은 형식으로 피벗
@@ -79,14 +89,6 @@ def financial_statements_etl():
         df_pivot.to_csv(processed_file_path, index=False, encoding='utf-8-sig')
 
         return processed_file_path
-
-    @task(task_id="upload_raw_to_s3")
-    def upload_raw_to_s3(file_path: str):
-        """로컬에 저장된 원본 재무제표 CSV 파일을 S3에 업로드"""
-        s3_hook = S3Hook(aws_conn_id='s3_conn')
-        s3_bucket = 'team-won-2-bucket'
-        s3_key = f'newb_data/bank_of_korea/raw/FinancialStatements.csv'
-        s3_hook.load_file(file_path, s3_key, bucket_name=s3_bucket, replace=True)
 
     @task(task_id="upload_processed_to_s3")
     def upload_processed_to_s3(file_path: str):
