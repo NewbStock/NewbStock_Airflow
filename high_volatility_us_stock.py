@@ -7,6 +7,7 @@ from airflow.hooks.base import BaseHook
 import pandas as pd
 import logging
 from io import StringIO
+import os
 
 # 기본 DAG 설정
 default_args = {
@@ -101,13 +102,22 @@ def high_volatility_us_stock():
                 'redshift_config': redshift_config
             }
 
-            response = lambda_client.invoke(
-                FunctionName=lambda_function_name,
-                InvocationType='Event',
-                Payload=json.dumps(payload)
-            )
-            
-            logging.info(f"Invoked Lambda function {lambda_function_name} with response: {response}")
+            try:
+                response = lambda_client.invoke(
+                    FunctionName=lambda_function_name,
+                    InvocationType='Event',  # 또는 'RequestResponse'로 변경하여 동기 호출 가능
+                    Payload=json.dumps(payload)
+                )
+                logging.info(f"Invoked Lambda function {lambda_function_name} with response: {response}")
+            except Exception as e:
+                logging.error(f"Lambda 호출 중 오류 발생: {e}")
+
+            # 로컬 파일 삭제
+            try:
+                os.remove(file_path)
+                logging.info(f"로컬 파일 {file_path} 삭제 완료")
+            except Exception as e:
+                logging.error(f"로컬 파일 {file_path} 삭제 중 오류 발생: {e}")
 
 
     # DAG의 태스크들 연결
