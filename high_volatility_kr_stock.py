@@ -4,10 +4,12 @@ from datetime import datetime, timedelta
 from airflow.decorators import task, dag
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 from airflow.hooks.base import BaseHook
+from airflow.providers.postgres.hooks.postgres import PostgresHook
 import pandas as pd
 import logging
 from io import StringIO
 import os
+import psycopg2
 
 # 기본 DAG 인자 설정
 default_args = {
@@ -106,10 +108,43 @@ def high_volatility_kr_stock():
             except Exception as e:
                 logging.error(f"로컬 파일 {file_path} 삭제 중 오류 발생: {e}")
 
-    # DAG 실행 순서 정의
+
+    @task(task_id="load_to_redshift")
+    def load_to_redshift(processed_files):
+        """
+        S3에서 Lambda를 통해 처리된 파일들을 Redshift로 로드합니다.
+        """
+        redshift_conn_id = 'redshift_conn'
+        aws_conn_id = 'aws_default'
+        redshift_table = 'public.high_volatility_kr'
+        s3_bucket = 'team-won-2-bucket'
+        
+        redshift_hook = PostgresHook(postgres_conn_id=redshift_conn_id)
+        s3_hook = S3Hook(aws_conn_id=aws_conn_id)
+        
+        for s3_key in processed_files:
+            # Redshift COPY 명령어 실행
+            copy_sql = f"""
+                COPY {redshift_table}
+                FROM 's3://{s3_bucket}/{s3_key}'
+                ACCESS_KEY_ID '{s3_hook.get_credentials().access_key}'
+                SECRET_ACCESS_KEY '{s3_hook.get_credentials().secret_key}'
+                CSV
+                IGNOREHEADER 1
+                DELIMITER ','
+                REGION 'ap-northeast-2';
+            """
+            try:
+                redshift_hook.run(copy_sql)
+                logging.info(f"{s3_key} 데이터를 Redshift로 성공적으로 로드했습니다.")
+            except Exception as e:
+                logging.error(f"Redshift로 데이터를 로드하는 중 오류 발생: {e}")
+
+    # DAG의 태스크들 연결
     top_100_codes = read_csv_from_s3()
     local_files = fetch_csv_files(top_100_codes)
-    invoke_lambda_for_volatility(local_files)
+    processed_files = invoke_lambda_for_volatility(local_files)
+    load_to_redshift(processed_files)
 
 # DAG 인스턴스 생성
 dag = high_volatility_kr_stock()
