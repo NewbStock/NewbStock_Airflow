@@ -1,15 +1,14 @@
-from datetime import datetime, timedelta
-import logging
-import os
 import json
-import pandas as pd
-from io import StringIO
-
-from airflow import DAG
-from airflow.decorators import dag, task
-from airflow.providers.amazon.aws.hooks.s3 import S3Hook
-from airflow.providers.postgres.hooks.postgres import PostgresHook
 import boto3
+from datetime import datetime, timedelta
+from airflow.decorators import task, dag
+from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+from airflow.hooks.base import BaseHook
+import pandas as pd
+import logging
+from io import StringIO
+import os
+import psycopg2
 
 # 기본 DAG 설정
 default_args = {
