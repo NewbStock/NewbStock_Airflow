@@ -9,7 +9,6 @@ import pandas as pd
 import logging
 from io import StringIO
 import os
-import psycopg2
 
 # 기본 DAG 인자 설정
 default_args = {
@@ -122,6 +121,22 @@ def high_volatility_kr_stock():
 
         return processed_files
 
+    @task(task_id="truncate_table")
+    def truncate_table():
+        """
+        Redshift 테이블에서 데이터를 삭제합니다.
+        """
+        redshift_conn_id = 'redshift_conn'
+        redshift_hook = PostgresHook(postgres_conn_id=redshift_conn_id)
+        
+        truncate_sql = "TRUNCATE TABLE public.high_volatility_kr;"
+        
+        try:
+            redshift_hook.run(truncate_sql)
+            logging.info("테이블을 성공적으로 비웠습니다.")
+        except Exception as e:
+            logging.error(f"테이블을 비우는 중 오류 발생: {e}")
+
     @task(task_id="load_to_redshift")
     def load_to_redshift(processed_files):
         """
@@ -157,7 +172,7 @@ def high_volatility_kr_stock():
     top_100_codes = read_csv_from_s3()
     local_files = fetch_csv_files(top_100_codes)
     processed_files = invoke_lambda_for_volatility(local_files)
-    load_to_redshift(processed_files)
+    truncate_table() >> load_to_redshift(processed_files)
 
 # DAG 인스턴스 생성
 dag = high_volatility_kr_stock()
