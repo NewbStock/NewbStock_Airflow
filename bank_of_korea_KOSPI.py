@@ -22,7 +22,7 @@ default_args = {
     dag_id='kospi_etl',
     default_args=default_args,
     description='코스피 지수 ETL 작업',
-    schedule_interval=timedelta(days=1),
+    schedule_interval='0 22 * * *',  # 매일 저녁 10시에 실행
     start_date=datetime(2023, 1, 1),
     catchup=False
 )

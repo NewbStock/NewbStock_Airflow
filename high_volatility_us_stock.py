@@ -118,7 +118,7 @@ def high_volatility_us_stock():
         """
         처리된 데이터를 S3에서 가져와 Redshift에 로드합니다.
         """
-        s3_hook = S3Hook(aws_conn_id='s3_conn')
+        s3_hook = S3Hook(aws_conn_id='aws_default')  # AWS 자격 증명 가져오기
         s3_bucket = 'team-won-2-bucket'
 
         # Airflow Connections에서 Redshift 연결 정보 가져오기
@@ -130,6 +130,8 @@ def high_volatility_us_stock():
             'user': redshift_conn.login,
             'password': redshift_conn.password,
             'table': 'public.high_volatility_us',
+            'aws_access_key_id': s3_hook.get_credentials().access_key,
+            'aws_secret_access_key': s3_hook.get_credentials().secret_key
         }
 
         for s3_key in processed_files:
@@ -138,7 +140,8 @@ def high_volatility_us_stock():
                 copy_sql = f"""
                 COPY {redshift_config['table']}
                 FROM 's3://{s3_bucket}/{s3_key}'
-                IAM_ROLE '{redshift_config['iam_role']}'
+                ACCESS_KEY_ID '{redshift_config['aws_access_key_id']}'
+                SECRET_ACCESS_KEY '{redshift_config['aws_secret_access_key']}'
                 CSV
                 IGNOREHEADER 1
                 DATEFORMAT 'auto';
