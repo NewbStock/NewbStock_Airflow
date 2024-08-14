@@ -175,26 +175,27 @@ def financial_statements_etl():
         # 데이터프레임 합치기
         combined_df = pd.concat(dfs)
 
-        # 필요한 데이터 전처리 수행
+
+        # Date 컬럼 생성
         combined_df['Date'] = pd.to_datetime(combined_df['TIME'], format='%Y')
+
+        # 피벗 테이블 생성
         df_pivot = combined_df.pivot_table(
-            index='Date', 
-            columns='ITEM_NAME1', 
-            values='DATA_VALUE', 
-            aggfunc='first'
+            index='Date',  # 행 인덱스는 Date
+            columns=['ITEM_NAME1', 'ITEM_NAME2', 'ITEM_NAME3'],  # 열 인덱스는 ITEM_NAME1, ITEM_NAME2, ITEM_NAME3
+            values='DATA_VALUE',  # 셀 값은 DATA_VALUE
+            aggfunc='first'  # 동일한 조합의 값이 여러 개 있을 때 첫 번째 값 사용
         ).reset_index()
 
-        processed_file_path = '/tmp/ProcessedFinancialStatements.csv'
-        df_pivot.to_csv(processed_file_path, index=False, encoding='utf-8-sig')
-
-        return processed_file_path
+        # 결과 출력
+        print(df_pivot)
 
     @task(task_id="upload_processed_to_s3")
     def upload_processed_to_s3(file_path: str):
         """처리된 데이터를 S3 버킷에 업로드"""
         s3_hook = S3Hook(aws_conn_id='s3_conn')
         s3_bucket = 'team-won-2-bucket'
-        s3_key = 'newb_data/bank_of_korea/processed/FinancialStatements.csv'
+        s3_key = 'newb_data/bank_of_korea/processed/ProcessedFinancialStatements.csv'
         s3_hook.load_file(file_path, s3_key, bucket_name=s3_bucket, replace=True)
         return f"s3://{s3_bucket}/{s3_key}"
 
