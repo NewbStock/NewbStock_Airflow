@@ -120,7 +120,7 @@ def high_volatility_us_stock():
         S3에서 Lambda를 통해 처리된 파일들을 Redshift로 로드합니다.
         """
         redshift_conn_id = 'redshift_conn'
-        aws_conn_id = 's3_conn'
+        aws_conn_id = 'aws_default'
         redshift_table = 'public.high_volatility_us'
         s3_bucket = 'team-won-2-bucket'
         
