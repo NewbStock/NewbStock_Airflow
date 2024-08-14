@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from airflow.decorators import task, dag
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 from airflow.hooks.base import BaseHook
+from airflow.providers.postgres.hooks.postgres import PostgresHook
 import pandas as pd
 import logging
 from io import StringIO
