@@ -125,10 +125,9 @@ def high_volatility_us_stock():
         return processed_files
 
     @task(task_id="load_to_redshift")
-    def load_to_redshift(processed_files):
+    def load_to_redshift():
         """
-        S3에서 Lambda를 통해 처리된 파일들을 Redshift로 로드합니다.
-        주말에는 데이터를 로드하지 않습니다.
+        S3에 있는 모든 파일을 Redshift로 로드합니다.
         """
         redshift_conn_id = 'redshift_conn'
         aws_conn_id = 's3_conn'
@@ -138,13 +137,12 @@ def high_volatility_us_stock():
         redshift_hook = PostgresHook(postgres_conn_id=redshift_conn_id)
         s3_hook = S3Hook(aws_conn_id=aws_conn_id)
         
-        today = datetime.today().strftime('%Y-%m-%d')
+        # S3에 저장된 파일 리스트
+        files = ['AAPL.csv', 'MSFT.csv', 'NVDA.csv']
 
-        for s3_key in processed_files:
-            if today not in s3_key:
-                logging.info(f"{s3_key}은 오늘({today})의 데이터가 아니므로 건너뜁니다.")
-                continue
-
+        for file_name in files:
+            s3_key = file_name
+            
             # Redshift COPY 명령어 실행
             copy_sql = f"""
                 COPY {redshift_table}
