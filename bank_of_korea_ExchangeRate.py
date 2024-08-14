@@ -5,7 +5,9 @@ from datetime import datetime, timedelta
 from io import BytesIO
 from airflow.decorators import task, dag
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+from airflow.providers.postgres.hooks.postgres import PostgresHook
 import pandas as pd
+
 
 # 기본 인자 설정
 default_args = {
@@ -75,7 +77,7 @@ def exchange_rate_etl():
             csv_content = obj.get()["Body"].read()
             df = pd.read_csv(BytesIO(csv_content), encoding='utf-8-sig')
 
-            # 필요한 데이터 전처리 수행
+            # 필요한 열만 선택하여 전처리 수행
             df_pivot = df.pivot_table(
                 index='TIME', 
                 columns='ITEM_NAME1', 
@@ -83,8 +85,12 @@ def exchange_rate_etl():
                 aggfunc='first'
             ).reset_index()
 
+            # 필요한 열만 남기기
+            df_selected = df_pivot[['TIME', '원/100엔(하나은행고시)', '원/달러(종가 15:30)', '원/위안(종가)']]
+            df_selected.columns = ['TIME', '원/100엔 종가', '원/달러 종가', '원/위안 종가']  # 열 이름 변경
+
             processed_file_path = '/tmp/ProcessedExchangeRateData.csv'
-            df_pivot.to_csv(processed_file_path, index=False, encoding='utf-8-sig')
+            df_selected.to_csv(processed_file_path, index=False, encoding='utf-8-sig')
 
             return processed_file_path
         except Exception as e:
@@ -100,10 +106,36 @@ def exchange_rate_etl():
         s3_hook.load_file(file_path, s3_key, bucket_name=s3_bucket, replace=True)
         return f"s3://{s3_bucket}/{s3_key}"
 
+    @task(task_id="load_to_redshift")
+    def load_to_redshift(processed_s3_path: str):
+        """처리된 데이터를 Redshift로 로드"""
+        redshift_conn_id = 'redshift_conn'
+        redshift_table = 'public.exchange_rate'
+        aws_conn_id = 'aws_default'
+
+        s3_hook = S3Hook(aws_conn_id=aws_conn_id)
+
+        s3_bucket, s3_key = processed_s3_path.replace('s3://', '').split('/', 1)
+        redshift_hook = PostgresHook(postgres_conn_id=redshift_conn_id)
+
+        copy_sql = f"""
+            COPY {redshift_table}
+            FROM 's3://{s3_bucket}/{s3_key}'
+            ACCESS_KEY_ID '{s3_hook.get_credentials().access_key}'
+            SECRET_ACCESS_KEY '{s3_hook.get_credentials().secret_key}'
+            CSV
+            IGNOREHEADER 1
+            DELIMITER ','
+            REGION 'ap-northeast-2';
+        """
+
+        redshift_hook.run(copy_sql)
+
     # 태스크 호출 및 종속성 설정
     file_path = fetch_data()
     raw_s3_path = upload_raw_to_s3(file_path)
     processed_file_path = process_data(raw_s3_path)
-    upload_processed_to_s3(processed_file_path)
+    processed_s3_path = upload_processed_to_s3(processed_file_path)
+    load_to_redshift(processed_s3_path)
 
 dag = exchange_rate_etl()
