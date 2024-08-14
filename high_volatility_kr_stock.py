@@ -73,12 +73,12 @@ def high_volatility_kr_stock():
     
     @task(task_id="invoke_lambda_for_volatility")
     def invoke_lambda_for_volatility(local_files):
-        """로컬에 저장된 주식 데이터에서 변동성이 큰 날을 찾아 Lambda 함수를 호출해 처리합니다."""
         lambda_client = boto3.client('lambda', region_name='ap-northeast-2')
-        lambda_function_name = 'newbstock_high_volatillity_kr_stock'
-
+        lambda_function_name = 'newbstock_high_volatility_kr_stock'
         s3_hook = S3Hook(aws_conn_id='s3_conn')
         s3_bucket = 'team-won-2-bucket'
+
+        processed_files = []
 
         for file_path in local_files:
             # S3에 파일 업로드
@@ -98,6 +98,7 @@ def high_volatility_kr_stock():
                     Payload=json.dumps(payload)
                 )
                 logging.info(f"Invoked Lambda function {lambda_function_name} with response: {response}")
+                processed_files.append(s3_key)  # S3 경로를 리스트에 추가
             except Exception as e:
                 logging.error(f"Lambda 호출 중 오류 발생: {e}")
 
@@ -108,6 +109,7 @@ def high_volatility_kr_stock():
             except Exception as e:
                 logging.error(f"로컬 파일 {file_path} 삭제 중 오류 발생: {e}")
 
+        return processed_files  # 처리된 S3 파일 경로를 반환
 
     @task(task_id="load_to_redshift")
     def load_to_redshift(processed_files):
