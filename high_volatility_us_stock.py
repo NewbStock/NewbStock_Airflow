@@ -105,6 +105,17 @@ def high_volatility_us_stock():
                     Payload=json.dumps(payload)
                 )
 
+                # Lambda의 반환값 처리
+                response_payload = json.loads(response['Payload'].read())
+                if response_payload.get('statusCode') == 200:
+                    body = json.loads(response_payload['body'])
+                    if 'processed_key' in body:
+                        processed_files.append(body['processed_key'])
+                    else:
+                        logging.warning(f"Lamdba did not return a processed_key for {s3_key}")
+                else:
+                    logging.error(f"Lamdba 호출 중 오류 발생: {response_payload.get('body')}")
+
             except Exception as e:
                 logging.error(f"Lambda 호출 중 오류 발생: {e}")
 
