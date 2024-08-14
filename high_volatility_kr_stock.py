@@ -94,11 +94,11 @@ def high_volatility_kr_stock():
             try:
                 response = lambda_client.invoke(
                     FunctionName=lambda_function_name,
-                    InvocationType='Event',  # 비동기 호출
+                    InvocationType='RequestResponse',  # 동기 호출
                     Payload=json.dumps(payload)
                 )
                 logging.info(f"Invoked Lambda function {lambda_function_name} with response: {response}")
-                processed_files.append(s3_key)  # S3 경로를 리스트에 추가
+                processed_files.append(f'newb_data/stock_data/kr/{s3_key.split("/")[-1]}')  # Lambda 함수에서 처리된 경로로 업데이트
             except Exception as e:
                 logging.error(f"Lambda 호출 중 오류 발생: {e}")
 
