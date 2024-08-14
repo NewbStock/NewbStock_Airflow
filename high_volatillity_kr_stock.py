@@ -1,9 +1,13 @@
+import json
+import boto3
 from datetime import datetime, timedelta
 from airflow.decorators import task, dag
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+from airflow.hooks.base import BaseHook
 import pandas as pd
 import logging
 from io import StringIO
+import os
 
 # 기본 DAG 인자 설정
 default_args = {
@@ -52,11 +56,11 @@ def high_volatility_kr_stock():
             file_key = f'kr_stock_data/stock_data/{formatted_code}.csv'
             try:
                 csv_content = s3_hook.read_key(file_key, s3_bucket)
-                df = pd.read_csv(StringIO(csv_content))
-                
-                # 임시 파일에 CSV 내용을 저장
                 temp_csv = f"/tmp/{formatted_code}.csv"
-                df.to_csv(temp_csv, index=False)
+                
+                # 로컬 임시 파일에 저장
+                with open(temp_csv, 'w') as f:
+                    f.write(csv_content)
                 
                 local_files.append(temp_csv)
                 logging.info(f"Successfully processed {file_key}")
@@ -65,47 +69,59 @@ def high_volatility_kr_stock():
 
         return local_files
     
-    @task(task_id="find_high_volatility_days")
-    def find_high_volatility_days(local_files):
-        """로컬에 저장된 주식 데이터에서 변동성이 큰 날을 찾아 S3에 업로드합니다."""
+    @task(task_id="invoke_lambda_for_volatility")
+    def invoke_lambda_for_volatility(local_files):
+        """로컬에 저장된 주식 데이터에서 변동성이 큰 날을 찾아 Lambda 함수를 호출해 처리합니다."""
+        lambda_client = boto3.client('lambda', region_name='ap-northeast-2')
+        lambda_function_name = 'newbstock_high_volatility_kr_stock'
+
+        # Redshift 연결 정보 가져오기
+        redshift_conn = BaseHook.get_connection('redshift_conn')
+        redshift_config = {
+            'host': redshift_conn.host,
+            'port': redshift_conn.port,
+            'dbname': redshift_conn.schema,
+            'user': redshift_conn.login,
+            'password': redshift_conn.password,
+            'table': 'high_volatility_days_kr_stock'
+        }
+
         s3_hook = S3Hook(aws_conn_id='s3_conn')
         s3_bucket = 'team-won-2-bucket'
-        
-        for file_path in local_files:
-            df = pd.read_csv(file_path)
-            if not df.empty:
-                logging.info(f"DataFrame columns in {file_path}: {df.columns.tolist()}")
-                code = df['code'].iloc[0]  
-                
-                # 변동률 계산
-                df['Close'] = df['Close'].astype(float)
-                df['Prev_Close'] = df['Close'].shift(1)
-                df['Change'] = (df['Close'] - df['Prev_Close']) / df['Prev_Close'] * 100
 
-                # 변동률이 10% 이상인 날짜 찾기
-                high_volatility = df[df['Change'].abs() > 10]
-                if not high_volatility.empty:
-                    high_volatility_file = f"/tmp/{code}_high_volatility.csv"
-                    high_volatility.to_csv(high_volatility_file, index=False)
-                    
-                    # S3에 업로드
-                    s3_key = f'newb_data/stock_data/kr/{code}_high_volatility.csv'
-                    s3_hook.load_file(
-                        filename=high_volatility_file,
-                        key=s3_key,
-                        bucket_name=s3_bucket,
-                        replace=True
-                    )
-                    logging.info(f"Successfully uploaded {s3_key} to S3")
-                else:
-                    logging.info(f"No high volatility days found for {code}")
-            else:
-                logging.warning(f"The file {file_path} is empty and will be skipped")
+        for file_path in local_files:
+            # S3에 파일 업로드
+            s3_key = f"temp/{file_path.split('/')[-1]}"
+            s3_hook.load_file(filename=file_path, key=s3_key, bucket_name=s3_bucket, replace=True)
+
+            # Lambda에 전달할 페이로드에 S3 경로 포함
+            payload = {
+                's3_bucket': s3_bucket,
+                's3_key': s3_key,
+                'redshift_config': redshift_config
+            }
+
+            try:
+                response = lambda_client.invoke(
+                    FunctionName=lambda_function_name,
+                    InvocationType='Event',  # 비동기 호출
+                    Payload=json.dumps(payload)
+                )
+                logging.info(f"Invoked Lambda function {lambda_function_name} with response: {response}")
+            except Exception as e:
+                logging.error(f"Lambda 호출 중 오류 발생: {e}")
+
+            # 로컬 파일 삭제
+            try:
+                os.remove(file_path)
+                logging.info(f"로컬 파일 {file_path} 삭제 완료")
+            except Exception as e:
+                logging.error(f"로컬 파일 {file_path} 삭제 중 오류 발생: {e}")
 
     # DAG 실행 순서 정의
     top_100_codes = read_csv_from_s3()
     local_files = fetch_csv_files(top_100_codes)
-    find_high_volatility_days(local_files)
+    invoke_lambda_for_volatility(local_files)
 
 # DAG 인스턴스 생성
 dag = high_volatility_kr_stock()
