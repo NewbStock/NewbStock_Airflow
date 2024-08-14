@@ -1,10 +1,11 @@
 import csv
 import requests
-import pandas as pd
+import logging  # 추가된 부분
 from datetime import datetime, timedelta
+from io import BytesIO  # 추가된 부분
 from airflow.decorators import task, dag
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
-import os
+import pandas as pd
 
 # 기본 DAG 인자 설정
 default_args = {
@@ -165,10 +166,10 @@ def financial_statements_etl():
             try:
                 obj = s3_hook.get_key(s3_key, s3_bucket)
                 csv_content = obj.get()["Body"].read()
-                df = pd.read_csv(BytesIO(csv_content), encoding='utf-8-sig')
+                df = pd.read_csv(BytesIO(csv_content), encoding='utf-8-sig')  # BytesIO 사용
                 dfs.append(df)
             except Exception as e:
-                logging.error(f"Error reading file {s3_key} from S3: {e}")
+                logging.error(f"Error reading file {s3_key} from S3: {e}")  # logging 사용
                 raise
 
         # 데이터프레임 합치기
