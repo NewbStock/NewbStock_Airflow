@@ -104,15 +104,6 @@ def high_volatility_us_stock():
                     Payload=json.dumps(payload)
                 )
 
-                # Lambda 응답 처리
-                response_payload = json.loads(response['Payload'].read().decode('utf-8'))
-                processed_key = response_payload.get('processed_key', None)
-
-                if response['StatusCode'] == 200 and processed_key:
-                    processed_files.append(processed_key)
-                    logging.info(f"Lambda 함수가 처리한 파일을 S3에 저장했습니다: {processed_key}")
-                else:
-                    logging.error(f"Lambda 함수 호출에 실패했습니다: {response_payload}")
             except Exception as e:
                 logging.error(f"Lambda 호출 중 오류 발생: {e}")
 
