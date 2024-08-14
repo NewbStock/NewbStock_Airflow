@@ -75,7 +75,7 @@ def high_volatility_kr_stock():
     def invoke_lambda_for_volatility(local_files):
         """로컬에 저장된 주식 데이터에서 변동성이 큰 날을 찾아 Lambda 함수를 호출해 처리합니다."""
         lambda_client = boto3.client('lambda', region_name='ap-northeast-2')
-        lambda_function_name = 'newbstock_high_volatility_kr_stock'
+        lambda_function_name = 'newbstock_high_volatillity_kr_stock'
 
         s3_hook = S3Hook(aws_conn_id='s3_conn')
         s3_bucket = 'team-won-2-bucket'
