@@ -73,8 +73,12 @@ def high_volatility_kr_stock():
     
     @task(task_id="invoke_lambda_for_volatility")
     def invoke_lambda_for_volatility(local_files):
+        """
+        Lambda 함수를 호출하여 변동성 높은 데이터를 필터링하고 S3에 저장합니다.
+        """
         lambda_client = boto3.client('lambda', region_name='ap-northeast-2')
         lambda_function_name = 'newbstock_high_volatillity_kr_stock'
+        
         s3_hook = S3Hook(aws_conn_id='s3_conn')
         s3_bucket = 'team-won-2-bucket'
 
@@ -88,7 +92,8 @@ def high_volatility_kr_stock():
             # Lambda에 전달할 페이로드에 S3 경로 포함
             payload = {
                 's3_bucket': s3_bucket,
-                's3_key': s3_key
+                's3_key': s3_key,
+                'processed_bucket': s3_bucket
             }
 
             try:
@@ -97,20 +102,25 @@ def high_volatility_kr_stock():
                     InvocationType='RequestResponse',  # 동기 호출
                     Payload=json.dumps(payload)
                 )
-                logging.info(f"Invoked Lambda function {lambda_function_name} with response: {response}")
-                processed_files.append(f'newb_data/stock_data/kr/{s3_key.split("/")[-1]}')  # Lambda 함수에서 처리된 경로로 업데이트
+
+                # Lambda의 반환값 처리
+                response_payload = json.loads(response['Payload'].read())
+                if response_payload.get('statusCode') == 200:
+                    body = json.loads(response_payload['body'])
+                    if 'processed_key' in body:
+                        processed_files.append(body['processed_key'])
+                    else:
+                        logging.warning(f"Lambda did not return a processed_key for {s3_key}")
+                else:
+                    logging.error(f"Lambda 호출 중 오류 발생: {response_payload.get('body')}")
+
             except Exception as e:
                 logging.error(f"Lambda 호출 중 오류 발생: {e}")
 
             # 로컬 파일 삭제
-            try:
-                os.remove(file_path)
-                logging.info(f"로컬 파일 {file_path} 삭제 완료")
-            except Exception as e:
-                logging.error(f"로컬 파일 {file_path} 삭제 중 오류 발생: {e}")
+            os.remove(file_path)
 
-        logging.info(f"Processed files to return: {processed_files}")  # 로그로 확인
-        return processed_files  # 처리된 S3 파일 경로를 반환
+        return processed_files
 
     @task(task_id="load_to_redshift")
     def load_to_redshift(processed_files):
