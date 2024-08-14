@@ -79,7 +79,7 @@ def high_volatility_us_stock():
         Lambda 함수를 호출하여 변동성 높은 데이터를 필터링하고 S3에 저장합니다.
         """
         lambda_client = boto3.client('lambda', region_name='ap-northeast-2')
-        lambda_function_name = 'newbstock_high_volatility_kr_stock'
+        lambda_function_name = 'newbstock_high_volatility_us_stock'
         
         s3_hook = S3Hook(aws_conn_id='s3_conn')
         s3_bucket = 'team-won-2-bucket'
@@ -88,7 +88,7 @@ def high_volatility_us_stock():
 
         for file_path in local_files:
             # S3에 파일 업로드
-            s3_key = f"newb_data/stock_data/kr/{file_path.split('/')[-1]}"
+            s3_key = f"temp/{file_path.split('/')[-1]}"
             s3_hook.load_file(filename=file_path, key=s3_key, bucket_name=s3_bucket, replace=True)
 
             # Lambda에 전달할 페이로드에 S3 경로 포함
@@ -112,21 +112,16 @@ def high_volatility_us_stock():
                     if 'processed_key' in body:
                         processed_files.append(body['processed_key'])
                     else:
-                        logging.warning(f"Lambda did not return a processed_key for {s3_key}")
+                        logging.warning(f"Lamdba did not return a processed_key for {s3_key}")
                 else:
-                    logging.error(f"Lambda 호출 중 오류 발생: {response_payload.get('body')}")
+                    logging.error(f"Lamdba 호출 중 오류 발생: {response_payload.get('body')}")
 
             except Exception as e:
                 logging.error(f"Lambda 호출 중 오류 발생: {e}")
 
             # 로컬 파일 삭제
-            try:
-                os.remove(file_path)
-                logging.info(f"로컬 파일 {file_path} 삭제 완료")
-            except Exception as e:
-                logging.error(f"로컬 파일 {file_path} 삭제 중 오류 발생: {e}")
+            os.remove(file_path)
 
-        logging.info(f"Processed files to return: {processed_files}")  # 로그로 확인
         return processed_files
 
 
