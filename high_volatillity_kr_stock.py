@@ -83,7 +83,7 @@ def high_volatility_kr_stock():
             'dbname': redshift_conn.schema,
             'user': redshift_conn.login,
             'password': redshift_conn.password,
-            'table': 'high_volatility_days_kr_stock'
+            'table': 'public.high_volatility_days_kr_stock'
         }
 
         s3_hook = S3Hook(aws_conn_id='s3_conn')
