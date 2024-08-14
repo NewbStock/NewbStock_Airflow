@@ -74,7 +74,7 @@ def high_volatility_kr_stock():
     @task(task_id="invoke_lambda_for_volatility")
     def invoke_lambda_for_volatility(local_files):
         lambda_client = boto3.client('lambda', region_name='ap-northeast-2')
-        lambda_function_name = 'newbstock_high_volatility_kr_stock'
+        lambda_function_name = 'newbstock_high_volatillity_kr_stock'
         s3_hook = S3Hook(aws_conn_id='s3_conn')
         s3_bucket = 'team-won-2-bucket'
 
@@ -109,6 +109,7 @@ def high_volatility_kr_stock():
             except Exception as e:
                 logging.error(f"로컬 파일 {file_path} 삭제 중 오류 발생: {e}")
 
+        logging.info(f"Processed files to return: {processed_files}")  # 로그로 확인
         return processed_files  # 처리된 S3 파일 경로를 반환
 
     @task(task_id="load_to_redshift")
