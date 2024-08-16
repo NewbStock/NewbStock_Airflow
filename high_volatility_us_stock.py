@@ -45,7 +45,7 @@ def high_volatility_us_stock():
         csv_content = s3_hook.read_key(s3_key, s3_bucket)
 
         df = pd.read_csv(StringIO(csv_content))
-        top_100_codes = df['Code'].head(3).tolist()
+        top_100_codes = df['code'].head(3).tolist()
         return top_100_codes
     
     @task(task_id="fetch_csv_files")
