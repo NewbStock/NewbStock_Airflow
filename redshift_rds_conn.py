@@ -103,7 +103,7 @@ def redshift_to_s3_and_rds():
         """
         rds_conn_id = 'rds_conn'
         s3_bucket = 'team-won-2-redshift-rds-conn'
-        local_file_path = '/tmp/tempfile.csv.gz'
+        local_file_path = f"/tmp/{s3_key.split('/')[-1]}"
 
         s3_hook = S3Hook(aws_conn_id='s3_conn')
         s3_hook.get_conn().download_file(s3_bucket, s3_key, local_file_path)
@@ -124,7 +124,8 @@ def redshift_to_s3_and_rds():
         finally:
             cursor.close()
             conn.close()
-            os.remove(local_file_path)
+            if os.path.exists(local_file_path):
+                os.remove(local_file_path)
 
     # DAG의 태스크들 연결
     table_names = get_public_tables()
