@@ -5,7 +5,6 @@ from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 import logging
 import os
-import gzip
 import io
 
 # 기본 DAG 인자 설정
@@ -58,13 +57,13 @@ def redshift_to_s3_and_rds():
     @task(task_id="extract_and_upload_table")
     def extract_and_upload_table(table_name):
         """
-        주어진 테이블의 데이터를 추출하여 압축 후 S3에 업로드합니다.
+        주어진 테이블의 데이터를 추출하여 S3에 업로드합니다.
         """
         redshift_conn_id = 'redshift_conn'
         redshift_hook = PostgresHook(postgres_conn_id=redshift_conn_id)
         s3_hook = S3Hook(aws_conn_id='s3_conn')
         s3_bucket = 'team-won-2-redshift-rds-conn'
-        s3_key = f"redshift_data/{table_name}.csv.gz"
+        s3_key = f"redshift_data/{table_name}.csv"
 
         extract_query = f"""
             SELECT *
@@ -79,11 +78,10 @@ def redshift_to_s3_and_rds():
             data = cursor.fetchall()
             columns = [desc[0] for desc in cursor.description]
 
-            with io.BytesIO() as mem_file:
-                with gzip.GzipFile(fileobj=mem_file, mode='wb') as gz:
-                    gz.write((','.join(columns) + '\n').encode('utf-8'))
-                    for row in data:
-                        gz.write((','.join(map(str, row)) + '\n').encode('utf-8'))
+            with io.StringIO() as mem_file:
+                mem_file.write(','.join(columns) + '\n')
+                for row in data:
+                    mem_file.write(','.join(map(str, row)) + '\n')
                 mem_file.seek(0)
                 s3_hook.load_file_obj(mem_file, key=s3_key, bucket_name=s3_bucket, replace=True)
 
@@ -102,7 +100,7 @@ def redshift_to_s3_and_rds():
         """
         rds_conn_id = 'rds_conn'
         s3_bucket = 'team-won-2-redshift-rds-conn'
-        local_file_path = '/tmp/tempfile.csv.gz'
+        local_file_path = '/tmp/tempfile.csv'
 
         s3_hook = S3Hook(aws_conn_id='s3_conn')
         s3_hook.get_conn().download_file(s3_bucket, s3_key, local_file_path)
@@ -112,8 +110,8 @@ def redshift_to_s3_and_rds():
         cursor = conn.cursor()
 
         try:
-            with gzip.open(local_file_path, 'rt') as f:
-                cursor.copy_expert(f"COPY public.{s3_key.split('/')[-1].replace('.csv.gz', '')} FROM STDIN WITH CSV HEADER;", f)
+            with open(local_file_path, 'r') as f:
+                cursor.copy_expert(f"COPY public.{s3_key.split('/')[-1].replace('.csv', '')} FROM STDIN WITH CSV HEADER;", f)
             
             conn.commit()
             logging.info(f"Data from {s3_key} loaded to RDS successfully.")
