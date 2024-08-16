@@ -7,6 +7,7 @@ import logging
 import os
 import gzip
 import io
+import csv
 
 # 기본 DAG 인자 설정
 default_args = {
@@ -79,12 +80,11 @@ def redshift_to_s3_and_rds():
             data = cursor.fetchall()
             columns = [desc[0] for desc in cursor.description]
 
-            # 데이터를 압축하여 메모리 버퍼에 저장
             with io.BytesIO() as mem_file:
                 with gzip.GzipFile(fileobj=mem_file, mode='wb') as gz:
-                    gz.write((','.join(columns) + '\n').encode('utf-8'))
-                    for row in data:
-                        gz.write((','.join(map(str, row)) + '\n').encode('utf-8'))
+                    writer = csv.writer(io.TextIOWrapper(gz, encoding='utf-8'), delimiter=',', quoting=csv.QUOTE_MINIMAL)
+                    writer.writerow(columns)
+                    writer.writerows(data)
                 mem_file.seek(0)
                 s3_hook.load_file_obj(mem_file, key=s3_key, bucket_name=s3_bucket, replace=True)
 
