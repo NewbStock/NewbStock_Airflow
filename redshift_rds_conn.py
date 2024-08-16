@@ -6,7 +6,6 @@ from airflow.providers.postgres.hooks.postgres import PostgresHook
 import logging
 import os
 import gzip
-import io
 
 # 기본 DAG 인자 설정
 default_args = {
@@ -62,7 +61,7 @@ def redshift_to_s3_and_rds():
         """
         redshift_conn_id = 'redshift_conn'
         redshift_hook = PostgresHook(postgres_conn_id=redshift_conn_id)
-        s3_hook = S3Hook(aws_conn_id='s3_conn')
+        s3_hook = S3Hook(aws_conn_id='aws_default')  # aws_default 연결 사용
         s3_bucket = 'team-won-2-redshift-rds-conn'
         s3_key = f"redshift_data/{table_name}.csv.gz"  # 압축 파일로 변경
 
@@ -101,30 +100,30 @@ def redshift_to_s3_and_rds():
         """
         S3에서 PostgreSQL RDS로 데이터를 로드합니다.
         """
-        rds_conn_id = 'rds_conn'
         s3_bucket = 'team-won-2-redshift-rds-conn'
+        local_file_path = '/tmp/tempfile.csv.gz'
+        rds_conn_id = 'rds_conn'
+        
+        s3_hook = S3Hook(aws_conn_id='s3_conn')
+        s3_hook.get_conn().download_file(s3_bucket, s3_key, local_file_path)
+
         rds_hook = PostgresHook(postgres_conn_id=rds_conn_id)
-
-        # Access Key와 Secret Key 가져오기
-        aws_access_key = S3Hook(aws_conn_id='s3_conn').get_credentials().access_key
-        aws_secret_key = S3Hook(aws_conn_id='s3_conn').get_credentials().secret_key
-
-        copy_sql = f"""
-            COPY public.{s3_key.split('/')[-1].replace('.csv.gz', '')}
-            FROM 's3://{s3_bucket}/{s3_key}'
-            CREDENTIALS 'aws_access_key_id={aws_access_key};aws_secret_access_key={aws_secret_key}'
-            CSV
-            GZIP
-            IGNOREHEADER 1;
-        """
+        conn = rds_hook.get_conn()
+        cursor = conn.cursor()
 
         try:
-            logging.info(f"Loading data from S3 to RDS: {s3_key}...")
-            rds_hook.run(copy_sql)
+            with gzip.open(local_file_path, 'rt') as f:
+                cursor.copy_expert("COPY public.table_name FROM STDIN WITH CSV HEADER;", f)
+            
+            conn.commit()
             logging.info(f"Data from {s3_key} loaded to RDS successfully.")
         except Exception as e:
             logging.error(f"Error loading data to RDS from {s3_key}: {e}")
             raise
+        finally:
+            cursor.close()
+            conn.close()
+            os.remove(local_file_path)
 
     # DAG의 태스크들 연결
     table_names = get_public_tables()
