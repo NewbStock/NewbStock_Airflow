@@ -83,7 +83,7 @@ def redshift_to_s3_and_rds():
                 for row in data:
                     mem_file.write(','.join(map(str, row)) + '\n')
                 mem_file.seek(0)
-                s3_hook.load_file_obj(mem_file, key=s3_key, bucket_name=s3_bucket, replace=True, encoding='utf-8')
+                s3_hook.load_file_obj(mem_file, key=s3_key, bucket_name=s3_bucket, replace=True)
 
             logging.info(f"File uploaded to S3: s3://{s3_bucket}/{s3_key}")
 
