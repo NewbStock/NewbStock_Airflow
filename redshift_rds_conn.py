@@ -36,11 +36,11 @@ def redshift_to_s3_all_public_tables():
         redshift_hook = PostgresHook(postgres_conn_id=redshift_conn_id)
 
         get_tables_query = """
-            SELECT tablename
+            SELECT DISTINCT tablename
             FROM pg_table_def
-            WHERE schemaname = 'public'
-            GROUP BY tablename;
+            WHERE schemaname = 'public';
         """
+
 
         logging.info("Fetching list of tables in public schema...")
         conn = redshift_hook.get_conn()
