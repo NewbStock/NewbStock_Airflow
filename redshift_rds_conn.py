@@ -82,11 +82,12 @@ def redshift_to_s3_and_rds():
             # 데이터를 압축하여 메모리 버퍼에 저장
             with io.BytesIO() as mem_file:
                 with gzip.GzipFile(fileobj=mem_file, mode='wb') as gz:
-                    gz.write((','.join(columns) + '\n').encode('utf-8'))
+                    gz.write(('\t'.join(columns) + '\n').encode('utf-8'))  # 탭으로 구분
                     for row in data:
-                        gz.write((','.join(map(str, row)) + '\n').encode('utf-8'))
+                        gz.write(('\t'.join(map(str, row)) + '\n').encode('utf-8'))  # 탭으로 구분
                 mem_file.seek(0)
                 s3_hook.load_file_obj(mem_file, key=s3_key, bucket_name=s3_bucket, replace=True)
+
 
             logging.info(f"File uploaded to S3: s3://{s3_bucket}/{s3_key}")
 
