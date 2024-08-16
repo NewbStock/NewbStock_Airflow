@@ -112,9 +112,16 @@ def redshift_to_s3_and_rds():
         conn = rds_hook.get_conn()
         cursor = conn.cursor()
 
+        table_name = s3_key.split('/')[-1].replace('.csv.gz', '')
+
         try:
+            # 테이블 데이터 비우기
+            cursor.execute(f"TRUNCATE TABLE public.{table_name};")
+            conn.commit()
+
+            # 데이터 로드
             with gzip.open(local_file_path, 'rt', encoding='utf-8') as f:
-                cursor.copy_expert(f"COPY public.{s3_key.split('/')[-1].replace('.csv.gz', '')} FROM STDIN WITH CSV HEADER;", f)
+                cursor.copy_expert(f"COPY public.{table_name} FROM STDIN WITH CSV HEADER;", f)
             
             conn.commit()
             logging.info(f"Data from {s3_key} loaded to RDS successfully.")
