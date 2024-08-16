@@ -95,6 +95,9 @@ def get_kr_marketcap_top100():
         
         # 오늘 날짜
         today = datetime.now().date()
+
+        truncate_sql = "truncate table kr_top100"
+        cur.execute(truncate_sql)
     
         for index, row in df.iterrows():
             insert_sql = f"""
