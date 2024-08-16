@@ -41,7 +41,6 @@ def redshift_to_s3_all_public_tables():
             WHERE schemaname = 'public';
         """
 
-
         logging.info("Fetching list of tables in public schema...")
         conn = redshift_hook.get_conn()
         cursor = conn.cursor()
@@ -71,32 +70,35 @@ def redshift_to_s3_all_public_tables():
             FROM public.{table_name}
         """
 
-        logging.info(f"Extracting data from {table_name}...")
-        conn = redshift_hook.get_conn()
-        cursor = conn.cursor()
-        cursor.execute(extract_query)
-        data = cursor.fetchall()
-        columns = [desc[0] for desc in cursor.description]
+        try:
+            logging.info(f"Extracting data from {table_name}...")
+            conn = redshift_hook.get_conn()
+            cursor = conn.cursor()
+            cursor.execute(extract_query)
+            data = cursor.fetchall()
+            columns = [desc[0] for desc in cursor.description]
 
-        with open(local_file_path, 'w') as f:
-            f.write(','.join(columns) + '\n')
-            for row in data:
-                f.write(','.join(map(str, row)) + '\n')
+            with open(local_file_path, 'w') as f:
+                f.write(','.join(columns) + '\n')
+                for row in data:
+                    f.write(','.join(map(str, row)) + '\n')
 
-        cursor.close()
-        conn.close()
+            cursor.close()
+            conn.close()
 
-        logging.info(f"Uploading {local_file_path} to S3 bucket {s3_bucket} with key {s3_key}...")
-        s3_hook.load_file(filename=local_file_path, key=s3_key, bucket_name=s3_bucket, replace=True)
-        logging.info(f"File uploaded to S3: s3://{s3_bucket}/{s3_key}")
+            logging.info(f"Uploading {local_file_path} to S3 bucket {s3_bucket} with key {s3_key}...")
+            s3_hook.load_file(filename=local_file_path, key=s3_key, bucket_name=s3_bucket, replace=True)
+            logging.info(f"File uploaded to S3: s3://{s3_bucket}/{s3_key}")
 
-        os.remove(local_file_path)
-        logging.info(f"Local file {local_file_path} deleted.")
+            os.remove(local_file_path)
+            logging.info(f"Local file {local_file_path} deleted.")
+        except Exception as e:
+            logging.error(f"Error processing table {table_name}: {e}")
+            raise
 
     # DAG의 태스크들 연결
     table_names = get_public_tables()
-    for table_name in table_names:
-        extract_and_upload_table(table_name)
+    extract_and_upload_table.expand(table_name=table_names)
 
 # DAG 인스턴스 생성
 dag = redshift_to_s3_all_public_tables()
