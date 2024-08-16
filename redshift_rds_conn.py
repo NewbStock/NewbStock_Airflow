@@ -78,10 +78,10 @@ def redshift_to_s3_and_rds():
             data = cursor.fetchall()
             columns = [desc[0] for desc in cursor.description]
 
-            with io.StringIO() as mem_file:
-                mem_file.write(','.join(columns) + '\n')
+            with io.BytesIO() as mem_file:
+                mem_file.write((','.join(columns) + '\n').encode('utf-8'))
                 for row in data:
-                    mem_file.write(','.join(map(str, row)) + '\n')
+                    mem_file.write((','.join(map(str, row)) + '\n').encode('utf-8'))
                 mem_file.seek(0)
                 s3_hook.load_file_obj(mem_file, key=s3_key, bucket_name=s3_bucket, replace=True)
 
