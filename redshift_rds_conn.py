@@ -6,6 +6,7 @@ from airflow.providers.postgres.hooks.postgres import PostgresHook
 import logging
 import os
 import gzip
+import io
 
 # 기본 DAG 인자 설정
 default_args = {
