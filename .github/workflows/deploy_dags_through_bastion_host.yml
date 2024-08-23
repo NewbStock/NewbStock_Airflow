@@ -54,7 +54,7 @@ jobs:
     - name: Sync DAGs to Airflow through Bastion
       run: |
         # Bastion Host를 통해 Private Subnet의 Airflow 서버에 SSH 터널링 설정
-          ssh -o StrictHostKeyChecking=no -i newbstock-Bastion-Host.pem -A ubuntu@13.209.247.212 \
+          ssh -o StrictHostKeyChecking=no -i newbstock-Bastion-Host.pem -A ec2-user@13.209.247.212 \
           ssh -o StrictHostKeyChecking=no -i newbstock-airflow-server.pem ubuntu@10.0.143.22 \
           'aws s3 sync s3://team-won-2-dags-bucket/ /home/ubuntu/newbstock_airflow/dags --delete'
       env:
