@@ -13,7 +13,7 @@ with DAG (
     default_args=default_args,
     description='Trigger Glue Job newbstock_kr_stock_data_s3_to_redshift ',
     schedule_interval=None,
-    start_date=datetime(2024, 7, 15),  # 시작 날짜
+    start_date=datetime(2024, 8, 15),  # 시작 날짜
     catchup=False,
 ) as dag:
     
