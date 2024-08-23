@@ -27,7 +27,7 @@ jobs:
       run: |
         aws s3 sync . s3://team-won-2-dags-bucket/  --delete
         
-    - name: Setup SSH keys
+    - name: Setup SSH keys and known hosts
       env:
         BASTION_SSH_KEY: ${{ secrets.BASTION_SSH_PRIVATE_KEY }}
         AIRFLOW_SSH_KEY: ${{ secrets.AIRFLOW_SSH_PRIVATE_KEY }}
@@ -36,8 +36,12 @@ jobs:
         echo "$BASTION_SSH_KEY" > ~/.ssh/newbstock-Bastion-Host.pem
         echo "$AIRFLOW_SSH_KEY" > ~/.ssh/newbstock-airflow-server.pem
         chmod 600 ~/.ssh/newbstock-Bastion-Host.pem ~/.ssh/newbstock-airflow-server.pem
-        ssh-keyscan -H 13.209.247.212 >> ~/.ssh/known_hosts
-        ssh-keyscan -H 10.0.143.22 >> ~/.ssh/known_hosts
+        ssh-keyscan -H 13.209.247.212 >> ~/.ssh/known_hosts || echo "Failed to add Bastion host to known hosts"
+        ssh-keyscan -H 10.0.143.22 >> ~/.ssh/known_hosts || echo "Failed to add Airflow host to known hosts"
+        
+    - name: Test SSH connection
+      run: |
+        ssh -i ~/.ssh/newbstock-Bastion-Host.pem -o StrictHostKeyChecking=no ec2-user@13.209.247.212 echo "Connection to Bastion successful" || echo "Failed to connect to Bastion"
 
     - name: Sync DAGs to Airflow through Bastion
       env:
