@@ -31,11 +31,10 @@ jobs:
         echo "${{ secrets.AIRFLOW_SSH_PRIVATE_KEY }}" > newbstock-airflow-server.pem
         chmod 600 newbstock-airflow-server.pem
 
-    - name: Set up SSH agent and add keys
+    - name: Set up SSH agent and add Bastion Host key
       uses: webfactory/ssh-agent@v0.5.3
       with:
-        ssh-private-key: |
-          ${{ secrets.BASTION_SSH_PRIVATE_KEY }}
+        ssh-private-key: ${{ secrets.BASTION_SSH_PRIVATE_KEY }}
 
     - name: Add Airflow SSH Key to Agent
       run: |
