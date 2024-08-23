@@ -38,11 +38,19 @@ jobs:
         chmod 600 ~/.ssh/newbstock-Bastion-Host.pem ~/.ssh/newbstock-airflow-server.pem
         ssh-keyscan -H 13.209.247.212 >> ~/.ssh/known_hosts || echo "Failed to add Bastion host to known hosts"
         ssh-keyscan -H 10.0.143.22 >> ~/.ssh/known_hosts || echo "Failed to add Airflow host to known hosts"
-        
-    - name: Test SSH connection
-      run: |
-        ssh -i ~/.ssh/newbstock-Bastion-Host.pem -o StrictHostKeyChecking=no ec2-user@13.209.247.212 echo "Connection to Bastion successful" || echo "Failed to connect to Bastion"
+        ls -l ~/.ssh  # 디버깅: SSH 키 파일 확인
 
+    - name: Add hosts to known_hosts
+      run: |
+        ssh-keyscan -H 13.209.247.212 >> ~/.ssh/known_hosts
+        ssh-keyscan -H 10.0.143.22 >> ~/.ssh/known_hosts
+        
+    - name: Test Bastion connection
+      env:
+        BASTION_HOST: 13.209.247.212
+      run: |
+        ssh -i ~/.ssh/newbstock-Bastion-Host.pem -o StrictHostKeyChecking=no ec2-user@$BASTION_HOST echo "Bastion connection successful"
+    
     - name: Sync DAGs to Airflow through Bastion
       env:
         BASTION_HOST: 13.209.247.212
