@@ -14,49 +14,36 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
 
-    - name: Set up Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.x'
-
-    - name: Save Bastion SSH Key
-      run: |
-        echo "${{ secrets.BASTION_SSH_PRIVATE_KEY }}" > newbstock-Bastion-Host.pem
-        chmod 600 newbstock-Bastion-Host.pem
-
-    - name: Save Airflow SSH Key
-      run: |
-        echo "${{ secrets.AIRFLOW_SSH_PRIVATE_KEY }}" > newbstock-airflow-server.pem
-        chmod 600 newbstock-airflow-server.pem
-
-    - name: Set up SSH agent and add Bastion Host key
-      uses: webfactory/ssh-agent@v0.5.3
-      with:
-        ssh-private-key: ${{ secrets.BASTION_SSH_PRIVATE_KEY }}
-
-    - name: Add Airflow SSH Key to Agent
-      run: |
-        ssh-add newbstock-airflow-server.pem
-
-    - name: Configure AWS CLI
-      run: |
-        aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws configure set region ${{ secrets.AWS_DEFAULT_REGION }}
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with: 
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
 
     - name: Upload DAG files to S3
       run: |
         aws s3 sync . s3://team-won-2-dags-bucket/  --delete
-  
-    - name: Sync DAGs to Airflow through Bastion
-      run: |
-        # Bastion Host를 통해 Private Subnet의 Airflow 서버에 SSH 터널링 설정
-          ssh -o StrictHostKeyChecking=no -i newbstock-Bastion-Host.pem -A ec2-user@13.209.247.212 \
-          ssh -o StrictHostKeyChecking=no -i newbstock-airflow-server.pem ubuntu@10.0.143.22 \
-          'aws s3 sync s3://team-won-2-dags-bucket/ /home/ubuntu/newbstock_airflow/dags --delete'
+        
+    - name: Setup SSH keys
       env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        AWS_DEFAULT_REGION: 'ap-northeast-2'
+        BASTION_SSH_KEY: ${{ secrets.BASTION_SSH_PRIVATE_KEY }}
+        AIRFLOW_SSH_KEY: ${{ secrets.AIRFLOW_SSH_PRIVATE_KEY }}
+      run: |
+        mkdir -p ~/.ssh
+        echo "$BASTION_SSH_KEY" > ~/.ssh/newbstock-Bastion-Host.pem
+        echo "$AIRFLOW_SSH_KEY" > ~/.ssh/newbstock-airflow-server.pem
+        chmod 600 ~/.ssh/newbstock-Bastion-Host.pem ~/.ssh/newbstock-airflow-server.pem
+        ssh-keyscan -H 13.209.247.212 >> ~/.ssh/known_hosts
+        ssh-keyscan -H 10.0.143.22 >> ~/.ssh/known_hosts
+
+    - name: Sync DAGs to Airflow through Bastion
+      env:
+        BASTION_HOST: 13.209.247.212
+        AIRFLOW_HOST: 10.0.143.22
+      run: |
+        ssh -i ~/.ssh/newbstock-Bastion-Host.pem -o ProxyCommand="none" -o StrictHostKeyChecking=no ec2-user@$BASTION_HOST \
+        ssh -i ~/.ssh/newbstock-airflow-server.pem -o StrictHostKeyChecking=no ubuntu@$AIRFLOW_HOST \
+        'aws s3 sync s3://team-won-2-dags-bucket/ /home/ubuntu/newbstock_airflow/dags --delete'
