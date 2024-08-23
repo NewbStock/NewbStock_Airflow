@@ -40,7 +40,7 @@ jobs:
 
     - name: Upload DAG files to S3
       run: |
-        aws s3 sync dags/ s3://team-won-2-dags-bucket/  --delete
+        aws s3 sync . s3://team-won-2-dags-bucket/  --delete
 
     - name: Sync DAGs to Airflow through Bastion
       run: |
