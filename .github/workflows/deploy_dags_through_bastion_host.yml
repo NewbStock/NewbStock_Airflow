@@ -26,6 +26,12 @@ jobs:
       with:
         ssh-private-key: ${{ secrets.BASTION_SSH_PRIVATE_KEY }}
 
+    - name: Add Airflow SSH Key to Agent
+      run: |
+        echo "${{ secrets.AIRFLOW_SSH_PRIVATE_KEY }}" > newbstock-airflow-server.pem
+        chmod 600 newbstock-airflow-server.pem
+        ssh-add newbstock-airflow-server.pem
+
     - name: Configure AWS CLI
       run: |
         aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
