@@ -21,15 +21,24 @@ jobs:
       with:
         python-version: '3.x'
 
-    - name: Set up SSH
-      uses: webfactory/ssh-agent@v0.5.3
-      with:
-        ssh-private-key: ${{ secrets.BASTION_SSH_PRIVATE_KEY }}
+    - name: Save Bastion SSH Key
+      run: |
+        echo "${{ secrets.BASTION_SSH_PRIVATE_KEY }}" > newbstock-Bastion-Host.pem
+        chmod 600 newbstock-Bastion-Host.pem
 
-    - name: Add Airflow SSH Key to Agent
+    - name: Save Airflow SSH Key
       run: |
         echo "${{ secrets.AIRFLOW_SSH_PRIVATE_KEY }}" > newbstock-airflow-server.pem
         chmod 600 newbstock-airflow-server.pem
+
+    - name: Set up SSH agent and add keys
+      uses: webfactory/ssh-agent@v0.5.3
+      with:
+        ssh-private-key: |
+          ${{ secrets.BASTION_SSH_PRIVATE_KEY }}
+
+    - name: Add Airflow SSH Key to Agent
+      run: |
         ssh-add newbstock-airflow-server.pem
 
     - name: Configure AWS CLI
@@ -41,12 +50,12 @@ jobs:
     - name: Upload DAG files to S3
       run: |
         aws s3 sync . s3://team-won-2-dags-bucket/  --delete
-
+  
     - name: Sync DAGs to Airflow through Bastion
       run: |
         # Bastion Host를 통해 Private Subnet의 Airflow 서버에 SSH 터널링 설정
-        ssh -o StrictHostKeyChecking=no -A -i ${{ secrets.AIRFLOW_SSH_PRIVATE_KEY }} ubuntu@13.209.247.212 \
-          ssh -o StrictHostKeyChecking=no ubuntu@10.0.143.22 \
+          ssh -o StrictHostKeyChecking=no -i newbstock-Bastion-Host.pem -A ubuntu@13.209.247.212 \
+          ssh -o StrictHostKeyChecking=no -i newbstock-airflow-server.pem ubuntu@10.0.143.22 \
           'aws s3 sync s3://team-won-2-dags-bucket/ /home/ubuntu/newbstock_airflow/dags --delete'
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
