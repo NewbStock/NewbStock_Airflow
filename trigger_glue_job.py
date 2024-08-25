@@ -1,11 +1,13 @@
 from airflow import DAG
 from airflow.providers.amazon.aws.operators.glue import GlueJobOperator
 from datetime import datetime
+from plugins import slack
 
 default_args = {
     'owner': 'kyoungyeon',
     'depends_on_past': False,
     'retries': 1,
+    'on_failure_callback': slack.on_failure_callback,
 }
 
 with DAG ( 
