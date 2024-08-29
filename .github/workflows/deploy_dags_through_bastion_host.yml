@@ -1,0 +1,61 @@
+name: Deploy DAGs to Airflow through Bastion
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with: 
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
+
+    - name: Upload DAG files to S3
+      run: |
+        aws s3 sync . s3://team-won-2-dags-bucket/  --delete
+        
+    - name: Setup SSH keys and known hosts
+      env:
+        BASTION_SSH_KEY: ${{ secrets.BASTION_SSH_PRIVATE_KEY }}
+        AIRFLOW_SSH_KEY: ${{ secrets.AIRFLOW_SSH_PRIVATE_KEY }}
+      run: |
+        mkdir -p ~/.ssh
+        echo "$BASTION_SSH_KEY" > ~/.ssh/newbstock-Bastion-Host.pem
+        echo "$AIRFLOW_SSH_KEY" > ~/.ssh/newbstock-airflow-server.pem
+        chmod 600 ~/.ssh/newbstock-Bastion-Host.pem ~/.ssh/newbstock-airflow-server.pem
+        ssh-keyscan -H 13.209.247.212 >> ~/.ssh/known_hosts || echo "Failed to add Bastion host to known hosts"
+        ssh-keyscan -H 10.0.143.22 >> ~/.ssh/known_hosts || echo "Failed to add Airflow host to known hosts"
+        ls -l ~/.ssh  # 디버깅: SSH 키 파일 확인
+
+    - name: Add hosts to known_hosts
+      run: |
+        ssh-keyscan -H 13.209.247.212 >> ~/.ssh/known_hosts
+        ssh-keyscan -H 10.0.143.22 >> ~/.ssh/known_hosts
+        
+    - name: Test Bastion connection
+      env:
+        BASTION_HOST: 13.209.247.212
+      run: |
+        ssh -i ~/.ssh/newbstock-Bastion-Host.pem -o StrictHostKeyChecking=no ec2-user@$BASTION_HOST echo "Bastion connection successful"
+    
+    - name: Sync DAGs to Airflow through Bastion
+      env:
+        BASTION_HOST: 13.209.247.212
+        AIRFLOW_HOST: 10.0.143.22
+      run: |
+        ssh -i ~/.ssh/newbstock-Bastion-Host.pem -o ProxyCommand="none" -o StrictHostKeyChecking=no ec2-user@$BASTION_HOST \
+        ssh -i ~/.ssh/newbstock-airflow-server.pem -o StrictHostKeyChecking=no ubuntu@$AIRFLOW_HOST \
+        'aws s3 sync s3://team-won-2-dags-bucket/ /home/ubuntu/newbstock_airflow/dags --delete'
