@@ -27,7 +27,8 @@ def USStockTop100():
     options.add_argument("headless")
 
     # 셀레니움 실행
-    with webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options) as driver:
+    remote_webdriver = 'remote_chromedriver'
+    with webdriver.Remote(f'{remote_webdriver}:4444/wd/hub', options=options) as driver:
         url = 'https://earnings.kr/marketcap'
         driver.get(url)
         driver.implicitly_wait(10) # 페이지 렌더링 대기
@@ -56,7 +57,10 @@ def USStockTop100():
                 ex_list.append('baddata')
                 print('data error', ex)
 
+        ranking_list = [i for i in range(1, 101)]
+
         df = pd.DataFrame({
+            'ranking': ranking_list,
             'name' : name_list,
             'code' : code_list,
             'excode' : ex_list,
@@ -67,7 +71,6 @@ def USStockTop100():
         csv_buffer = io.StringIO()
         df.to_csv(csv_buffer, index=False, encoding='utf-8-sig')
         csv_buffer.seek(0)
-
     key = "us_stock_data/us_stock_top100.csv"
     bucket_name = "team-won-2-bucket"
     s3_hook = S3Hook(aws_conn_id='s3_conn')   # connection 생성 후 변경 필요
@@ -77,9 +80,9 @@ def USStockTop100():
 
 default_args = {
     'owner': 'joonghyeon',
-    'depends_in_past': False,
+    'depends_on_past': False,
     'start_date': datetime(2024, 7, 15),
-    'retries': 1,
+    'retries': 3,
     'retry_delay': timedelta(minutes=3),
 }
 with DAG(
@@ -103,3 +106,4 @@ with DAG(
         dag=dag
     )
     crawling_task >> upload_to_redshift_task
+    
